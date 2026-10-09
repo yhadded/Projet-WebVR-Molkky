@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { CONFIG } from './config.js';
 
 export class Terrain {
   constructor(scene, physics) {
@@ -57,11 +58,33 @@ export class Terrain {
     this.throwZone.rotation.x = -Math.PI / 2;
     this.throwZone.position.y = 0.004;
     scene.add(this.throwZone);
+
+        // --- Table support du Mölkky ---
+    const { height } = CONFIG.table;
+    this.table = new THREE.Mesh(
+      new THREE.BoxGeometry(0.4, height, 0.3),
+      new THREE.MeshStandardMaterial({ color: 0x6b4423 })
+    );
+    this.table.castShadow = true;
+    this.table.receiveShadow = true;
+    scene.add(this.table);
+    this.tableCollider = world.createCollider(
+      RAPIER.ColliderDesc.cuboid(0.2, height / 2, 0.15)
+    );
   }
 
   // Appelé selon la difficulté
-  setThrowDistance(d) {
+    setThrowDistance(d) {
     this.throwLine.position.z = d;
     this.throwZone.position.z = d + 0.5;
+
+    // La table suit la zone de lancer, à droite du joueur
+    const { x, height } = CONFIG.table;
+    const tablePos = { x, y: height / 2, z: d + 0.5 };
+    this.table.position.set(tablePos.x, tablePos.y, tablePos.z);
+    this.tableCollider.setTranslation(tablePos);
+
+    // Point où poser le Mölkky (sur la table)
+    this.molkkySpawn = { x, y: height + CONFIG.molkky.radius + 0.01, z: d + 0.5 };
   }
 }
