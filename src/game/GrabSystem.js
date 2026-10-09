@@ -1,5 +1,9 @@
 import * as THREE from 'three';
 import { CONFIG } from './config.js';
+import { VelocityTracker } from '../core/VelocityTracker.js';
+
+const _linVel = new THREE.Vector3();
+const _angVel = new THREE.Vector3();
 
 // Variables réutilisées (évite de créer des objets à chaque frame → moins de saccades)
 const _handPos = new THREE.Vector3();
@@ -26,6 +30,9 @@ export class GrabSystem {
       hand.grip.addEventListener('squeezestart', () => this.tryGrab(hand));
       hand.grip.addEventListener('squeezeend', () => this.release(hand));
     });
+    
+    this.tracker = new VelocityTracker(CONFIG.throw.sampleWindowMs);
+    this.throwListeners = [];
   }
 
   distanceToMolkky(hand) {
@@ -35,20 +42,55 @@ export class GrabSystem {
   }
 
   tryGrab(hand) {
+    console.log('GRIP', hand.handedness, 'distance =', this.distanceToMolkky(hand).toFixed(2));
     if (this.heldBy) return;
     if (this.distanceToMolkky(hand) > CONFIG.grab.radius) return;
 
     this.heldBy = hand;
+    this.tracker.reset(); // nouvel historique pour ce lancer
     this.molkky.setHeld(true);
     this.molkky.setHighlight(false);
     this.controllers.vibrate(hand, 0.6, 50); // retour haptique
   }
 
-  release(hand) {
+    release(hand) {
     if (this.heldBy !== hand) return;
     this.heldBy = null;
+
+    // Vitesses mesurées sur les 80 dernières ms
+    const { powerMultiplier, maxSpeed, maxSpin } = CONFIG.throw;
+    this.tracker.getLinear(_linVel).multiplyScalar(powerMultiplier).clampLength(0, maxSpeed);
+    this.tracker.getAngular(_angVel).clampLength(0, maxSpin);
+
+    // Repasse en dynamique à la dernière pose de la main, avec l'élan de la main
+    const body = this.molkky.body;
     this.molkky.setHeld(false);
-    // Étape 4 : on transmettra ici la vitesse de la main → vrai lancer
+    body.setTranslation(_targetPos, true);
+    body.setRotation(_targetQuat, true);
+    body.setLinvel(_linVel, true);
+    body.setAngvel(_angVel, true);
+
+    this.controllers.vibrate(hand, 0.3, 30);
+    this._emitThrow(_linVel.length());
+  }
+
+  // Abonnement : fn({ speed }) appelée à chaque lancer (score, sons… plus tard)
+  onThrow(fn) {
+    this.throwListeners.push(fn);
+  }
+
+  _emitThrow(speed) {
+    this.throwListeners.forEach((fn) => fn({ speed }));
+  }
+
+  // DEBUG PC : simule un lancer depuis la ligne de lancer, sans casque
+  debugThrow(d) {
+    if (this.heldBy) return;
+    const body = this.molkky.body;
+    this.molkky.setPose({ x: (Math.random() - 0.5) * 0.3, y: 1.0, z: d });
+    body.setLinvel({ x: 0, y: 2.0, z: -5.5 }, true);  // vers les quilles
+    body.setAngvel({ x: -8, y: 0, z: 0 }, true);      // rotation bout-sur-bout
+    this._emitThrow(5.8);
   }
 
   // Pose monde visée = pose de la main × offset
@@ -71,6 +113,7 @@ export class GrabSystem {
       return;
     }
     this._computeTarget();
+    this.tracker.push(_targetPos, _targetQuat, performance.now());
     this.molkky.moveKinematic(_targetPos, _targetQuat);
   }
 

@@ -16,6 +16,7 @@ async function init() {
   const molkky = new Molkky(physics, sm.scene);
   const controllers = new XRControllers(sm.renderer, sm.player);
   const grab = new GrabSystem(controllers, molkky);
+  grab.onThrow(({ speed }) => console.log(`Lancer ! ${speed.toFixed(1)} m/s`));
 
   const d = CONFIG.throwDistance.normal;
   terrain.setThrowDistance(d);
@@ -35,6 +36,7 @@ async function init() {
     if (e.key === 'r') pins.resetAll();
     if (e.key === 'm') resetMolkky();
     if (e.key === 'b') throwTestBall(physics, sm.scene, d);
+    if (e.key === 't') grab.debugThrow(d);
   });
 
   // --- Boucle : l'ORDRE compte ---
@@ -42,6 +44,13 @@ async function init() {
   sm.onUpdate(() => grab.update());        // 2. cible du bâton tenu
   sm.onUpdate((dt) => physics.update(dt)); // 3. simuler
   sm.onUpdate(() => grab.lateUpdate());    // 4. caler le visuel sur la main
+    sm.renderer.xr.addEventListener('sessionstart', () => {
+    const session = sm.renderer.xr.getSession();
+    console.log('SESSION VR démarrée, état :', session.visibilityState);
+    session.addEventListener('visibilitychange', () =>
+      console.log('ÉTAT VR :', session.visibilityState)
+    );
+  });
   sm.start();
 }
 
