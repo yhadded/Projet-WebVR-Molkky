@@ -40,8 +40,10 @@ export const CONFIG = {
 
   // Table qui sert de support au Mölkky
   table: {
-    x: 0.5,       // 50 cm à droite du joueur
-    height: 0.8,  // hauteur de hanche
+    x: 0.8,        // à droite, juste à l'extérieur de la zone de lancer
+    zOffset: 0.3,  // un peu derrière la ligne
+    size: 0.3,     // plateau 30 × 30 cm
+    height: 0.75,  // hauteur de hanche
   },
 
   grab: {
@@ -64,5 +66,15 @@ export const CONFIG = {
     settleTime: 0.5,    // s : tout doit rester immobile pendant cette durée
     minWait: 1.0,       // s : attente minimale après le lancer (vol du bâton)
     timeout: 10,        // s : sécurité, on conclut même si ça bouge encore
+  },
+    
+  // Déplacements au joystick
+  locomotion: {
+    speed: 1.2,         // m/s
+    deadzone: 0.15,     // ignore les petits mouvements du joystick
+    snapAngleDeg: 30,   // rotation par crans
+    halfWidth: 0.6,     // zone de lancer : 1,2 m de large…
+    depth: 1.0,         // …et 1 m de profondeur derrière la ligne
+    lineMargin: 0.15,   // la tête reste à 15 cm derrière la ligne
   },
 };
