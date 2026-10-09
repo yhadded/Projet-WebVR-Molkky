@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { SceneManager } from './core/SceneManager.js';
 import { Physics } from './core/Physics.js';
 import { XRControllers } from './core/XRControllers.js';
+import { Locomotion } from './core/Locomotion.js';
 import { Terrain } from './game/Terrain.js';
 import { Pins } from './game/pins.js';
 import { Molkky, LYING } from './game/Molkky.js';
@@ -18,6 +19,7 @@ async function init() {
   const controllers = new XRControllers(sm.renderer, sm.player);
   const grab = new GrabSystem(controllers, molkky);
   const fallDetector = new FallDetector(pins, molkky);
+  const locomotion = new Locomotion(sm.player, sm.camera, controllers);
 
   grab.onThrow(({ speed }) => {
     console.log(`Lancer ! ${speed.toFixed(1)} m/s`);
@@ -29,6 +31,7 @@ async function init() {
 
   const d = CONFIG.throwDistance.normal;
   terrain.setThrowDistance(d);
+  locomotion.setThrowDistance(d);
   sm.setPlayerPosition(0, d + 0.5);
 
   const resetMolkky = () => molkky.setPose(terrain.molkkySpawn, LYING);
@@ -50,6 +53,7 @@ async function init() {
 
   // --- Boucle : l'ORDRE compte ---
   sm.onUpdate(() => controllers.update()); // 1. lire les boutons
+  sm.onUpdate((dt) => locomotion.update(dt));     // 1b. se déplacer (joysticks)
   sm.onUpdate(() => grab.update());               // 2. cible du bâton tenu
   sm.onUpdate(() => molkky.updateDamping());      // 3. freinage au sol
   sm.onUpdate((dt) => physics.update(dt));        // 4. simuler
