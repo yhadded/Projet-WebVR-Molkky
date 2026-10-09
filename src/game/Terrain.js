@@ -85,6 +85,6 @@ export class Terrain {
     this.tableCollider.setTranslation(tablePos);
 
     // Point où poser le Mölkky (sur la table)
-    this.molkkySpawn = { x, y: height + CONFIG.molkky.radius + 0.01, z: d + 0.5 };
+    this.molkkySpawn = { x, y: height + CONFIG.molkky.radius + 0.01, z: d + zOffset };
   }
 }
