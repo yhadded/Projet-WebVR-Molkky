@@ -26,4 +26,24 @@ export const CONFIG = {
     [5, 11, 12, 6],
     [7, 9, 8],
   ],
+    // Dimensions réelles du Mölkky : 22,5 cm × Ø 5,8 cm (~390 g)
+  molkky: {
+    radius: 0.029,
+    length: 0.225,
+    density: 650,
+    friction: 0.5,
+    restitution: 0.25,
+    color: 0xd9a066,
+  },
+
+  // Table qui sert de support au Mölkky
+  table: {
+    x: 0.5,       // 50 cm à droite du joueur
+    height: 0.8,  // hauteur de hanche
+  },
+
+  grab: {
+    radius: 0.2,               // distance max main ↔ centre du bâton pour saisir
+    offset: [0, 0, -0.04],     // position du bâton dans la main (repère de la manette)
+  },
 };

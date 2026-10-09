@@ -1,8 +1,11 @@
 import * as THREE from 'three';
 import { SceneManager } from './core/SceneManager.js';
 import { Physics } from './core/Physics.js';
+import { XRControllers } from './core/XRControllers.js';
 import { Terrain } from './game/Terrain.js';
 import { Pins } from './game/pins.js';
+import { Molkky, LYING } from './game/Molkky.js';
+import { GrabSystem } from './game/GrabSystem.js';
 import { CONFIG } from './game/config.js';
 
 async function init() {
@@ -10,22 +13,38 @@ async function init() {
   const sm = new SceneManager();
   const terrain = new Terrain(sm.scene, physics);
   const pins = new Pins(physics, sm.scene);
+  const molkky = new Molkky(physics, sm.scene);
+  const controllers = new XRControllers(sm.renderer, sm.player);
+  const grab = new GrabSystem(controllers, molkky);
 
   const d = CONFIG.throwDistance.normal;
   terrain.setThrowDistance(d);
   sm.setPlayerPosition(0, d + 0.5);
 
-  // --- DEBUG (à supprimer plus tard) ---
+  const resetMolkky = () => molkky.setPose(terrain.molkkySpawn, LYING);
+  resetMolkky();
+
+  // --- Contrôles VR ---
+  controllers.onButtonDown((hand, i) => {
+    if (i === 4 && !grab.heldBy) resetMolkky(); // A ou X → Mölkky sur la table
+    if (i === 5) pins.resetAll();               // B ou Y → quilles en place
+  });
+
+  // --- DEBUG clavier (PC) ---
   addEventListener('keydown', (e) => {
     if (e.key === 'r') pins.resetAll();
+    if (e.key === 'm') resetMolkky();
     if (e.key === 'b') throwTestBall(physics, sm.scene, d);
   });
 
-  sm.onUpdate((dt) => physics.update(dt));
+  // --- Boucle : l'ORDRE compte ---
+  sm.onUpdate(() => controllers.update()); // 1. lire les boutons
+  sm.onUpdate(() => grab.update());        // 2. cible du bâton tenu
+  sm.onUpdate((dt) => physics.update(dt)); // 3. simuler
+  sm.onUpdate(() => grab.lateUpdate());    // 4. caler le visuel sur la main
   sm.start();
 }
 
-// Balle de test : part de la ligne de lancer vers les quilles
 function throwTestBall(physics, scene, d) {
   const { RAPIER, world } = physics;
   const r = 0.05;
@@ -35,11 +54,10 @@ function throwTestBall(physics, scene, d) {
   );
   mesh.castShadow = true;
   scene.add(mesh);
-
   const body = world.createRigidBody(
     RAPIER.RigidBodyDesc.dynamic()
       .setTranslation((Math.random() - 0.5) * 0.2, 1, d)
-      .setLinvel(0, 2, -5) // vers l'avant (-Z), légèrement vers le haut
+      .setLinvel(0, 2, -5)
   );
   world.createCollider(RAPIER.ColliderDesc.ball(r).setDensity(650), body);
   physics.link(mesh, body);
