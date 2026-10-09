@@ -28,7 +28,10 @@ export class Pins {
   get(number) {
     return this.list[number - 1];
   }
-
+    // Quilles actuellement debout
+  standing() {
+    return this.list.filter((pin) => pin.isStanding());
+  }
   resetAll() {
     this.list.forEach((pin) => pin.resetToInitial());
   }
