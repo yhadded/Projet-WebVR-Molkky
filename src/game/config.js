@@ -17,6 +17,8 @@ export const CONFIG = {
     friction: 0.6,
     restitution: 0.2,
     color: 0xe8c99a,
+    linearDamping: 0.5,  // les quilles tombées glissent peu sur l'herbe
+    angularDamping: 2,   // et ne roulent pas indéfiniment
   },
 
   // Rangées de l'avant (côté joueur) vers le fond, de gauche à droite
@@ -52,5 +54,15 @@ export const CONFIG = {
     powerMultiplier: 1.0,  // à augmenter (1.2–1.5) si les lancers semblent trop mous en VR
     maxSpeed: 15,          // m/s : plafond anti-bug (pic de tracking)
     maxSpin: 30,           // rad/s : idem pour la rotation
+  },
+    
+  // Détection des quilles tombées
+  fall: {
+    tiltDeg: 60,        // inclinée de plus de 60° → tombée
+    linThreshold: 0.05, // m/s : en dessous, un objet est considéré immobile
+    angThreshold: 0.3,  // rad/s : idem pour la rotation
+    settleTime: 0.5,    // s : tout doit rester immobile pendant cette durée
+    minWait: 1.0,       // s : attente minimale après le lancer (vol du bâton)
+    timeout: 10,        // s : sécurité, on conclut même si ça bouge encore
   },
 };
