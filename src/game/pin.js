@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PhysicsObject } from '../core/PhysicsObject.js';
+import { PhysicsObject, prismCollider } from '../core/PhysicsObject.js';
 import { CONFIG } from './config.js';
 
 // Crée une texture à partir d'un canvas 2D
@@ -60,8 +60,10 @@ export class Pin extends PhysicsObject {
     // Le centre du cylindre est à mi-hauteur → posé au sol à y = height/2
     const start = { x: position.x, y: height / 2, z: position.z };
     const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
-      .setTranslation(start.x, start.y, start.z);
-    const colliderDesc = RAPIER.ColliderDesc.cylinder(height / 2, radius) // (demi-hauteur, rayon), axe Y
+      .setTranslation(start.x, start.y, start.z)
+      .setLinearDamping(CONFIG.pin.linearDamping)   // freinage de l'herbe
+      .setAngularDamping(CONFIG.pin.angularDamping);
+    const colliderDesc = prismCollider(RAPIER, height / 2, radius)
       .setDensity(density)
       .setFriction(friction)
       .setRestitution(restitution);
@@ -75,5 +77,24 @@ export class Pin extends PhysicsObject {
   // Remet la quille à sa place de départ (nouvelle partie)
   resetToInitial() {
     this.setPose(this.initialPosition);
+    this.setHighlight(null);
+  }
+
+  // Inclinaison : composante verticale de l'axe de la quille.
+  // 1 = parfaitement debout, 0 = couchée. (axe Y local tourné par le quaternion)
+  uprightness() {
+    const q = this.body.rotation();
+    return 1 - 2 * (q.x * q.x + q.z * q.z);
+  }
+
+  // Tombée = inclinée de plus de tiltDeg (60° par défaut).
+  // Une quille simplement penchée contre une autre ne compte pas.
+  isStanding() {
+    return this.uprightness() > Math.cos((CONFIG.fall.tiltDeg * Math.PI) / 180);
+  }
+
+  // Lueur de couleur (feedback) ; null = éteinte
+  setHighlight(color) {
+    this.mesh.material.forEach((m) => m.emissive.setHex(color ?? 0x000000));
   }
 }

@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { PhysicsObject } from '../core/PhysicsObject.js';
+import { PhysicsObject, prismCollider } from '../core/PhysicsObject.js';
 import { CONFIG } from './config.js';
 
 // Rotation "couché" : cylindre (axe Y) tourné de 90° autour de Z → posé à plat
@@ -20,7 +20,7 @@ export class Molkky extends PhysicsObject {
     // CCD (Continuous Collision Detection) : indispensable pour un objet lancé vite,
     // sinon il peut TRAVERSER une quille entre deux pas de simulation
     const bodyDesc = RAPIER.RigidBodyDesc.dynamic().setCcdEnabled(true);
-    const colliderDesc = RAPIER.ColliderDesc.cylinder(length / 2, radius)
+    const colliderDesc = prismCollider(RAPIER, length / 2, radius)
       .setDensity(density)
       .setFriction(friction)
       .setRestitution(restitution);
@@ -39,6 +39,15 @@ export class Molkky extends PhysicsObject {
   moveKinematic(pos, quat) {
     this.body.setNextKinematicTranslation(pos);
     this.body.setNextKinematicRotation(quat);
+  }
+
+    // Freinage seulement au sol : en vol, le bâton garde toute sa vitesse et sa rotation ;
+  // au sol, il s'arrête vite au lieu de rouler indéfiniment.
+  updateDamping() {
+    if (!this.body.isDynamic()) return;
+    const onGround = this.body.translation().y < CONFIG.molkky.radius * 2;
+    this.body.setLinearDamping(onGround ? 1 : 0);
+    this.body.setAngularDamping(onGround ? 3 : 0.05);
   }
 
   // Lueur quand la main est assez proche pour saisir

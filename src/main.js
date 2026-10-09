@@ -6,6 +6,7 @@ import { Terrain } from './game/Terrain.js';
 import { Pins } from './game/pins.js';
 import { Molkky, LYING } from './game/Molkky.js';
 import { GrabSystem } from './game/GrabSystem.js';
+import { FallDetector } from './game/FallDetector.js';
 import { CONFIG } from './game/config.js';
 
 async function init() {
@@ -16,7 +17,15 @@ async function init() {
   const molkky = new Molkky(physics, sm.scene);
   const controllers = new XRControllers(sm.renderer, sm.player);
   const grab = new GrabSystem(controllers, molkky);
-  grab.onThrow(({ speed }) => console.log(`Lancer ! ${speed.toFixed(1)} m/s`));
+  const fallDetector = new FallDetector(pins, molkky);
+
+  grab.onThrow(({ speed }) => {
+    console.log(`Lancer ! ${speed.toFixed(1)} m/s`);
+    fallDetector.start();
+  });
+  fallDetector.onResult(({ fallen, timedOut }) => {
+    console.log(`Quilles tombées : [${fallen.join(', ')}]${timedOut ? ' (timeout)' : ''}`);
+  });
 
   const d = CONFIG.throwDistance.normal;
   terrain.setThrowDistance(d);
@@ -41,9 +50,11 @@ async function init() {
 
   // --- Boucle : l'ORDRE compte ---
   sm.onUpdate(() => controllers.update()); // 1. lire les boutons
-  sm.onUpdate(() => grab.update());        // 2. cible du bâton tenu
-  sm.onUpdate((dt) => physics.update(dt)); // 3. simuler
-  sm.onUpdate(() => grab.lateUpdate());    // 4. caler le visuel sur la main
+  sm.onUpdate(() => grab.update());               // 2. cible du bâton tenu
+  sm.onUpdate(() => molkky.updateDamping());      // 3. freinage au sol
+  sm.onUpdate((dt) => physics.update(dt));        // 4. simuler
+  sm.onUpdate(() => grab.lateUpdate());           // 5. caler le visuel sur la main
+  sm.onUpdate((dt) => fallDetector.update(dt));   // 6. attendre l'immobilité    // 4. caler le visuel sur la main
     sm.renderer.xr.addEventListener('sessionstart', () => {
     const session = sm.renderer.xr.getSession();
     console.log('SESSION VR démarrée, état :', session.visibilityState);
