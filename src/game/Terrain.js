@@ -60,16 +60,16 @@ export class Terrain {
     scene.add(this.throwZone);
 
         // --- Table support du Mölkky ---
-    const { height } = CONFIG.table;
+    const { height, size } = CONFIG.table;
     this.table = new THREE.Mesh(
-      new THREE.BoxGeometry(0.4, height, 0.3),
+      new THREE.BoxGeometry(size, height,size),
       new THREE.MeshStandardMaterial({ color: 0x6b4423 })
     );
     this.table.castShadow = true;
     this.table.receiveShadow = true;
     scene.add(this.table);
     this.tableCollider = world.createCollider(
-      RAPIER.ColliderDesc.cuboid(0.2, height / 2, 0.15)
+      RAPIER.ColliderDesc.cuboid(size/2, height / 2, size/2)
     );
   }
 
@@ -79,8 +79,8 @@ export class Terrain {
     this.throwZone.position.z = d + 0.5;
 
     // La table suit la zone de lancer, à droite du joueur
-    const { x, height } = CONFIG.table;
-    const tablePos = { x, y: height / 2, z: d + 0.5 };
+    const { x, zOffset, height } = CONFIG.table;
+    const tablePos = { x, y: height / 2, z: d + zOffset };
     this.table.position.set(tablePos.x, tablePos.y, tablePos.z);
     this.tableCollider.setTranslation(tablePos);
 
