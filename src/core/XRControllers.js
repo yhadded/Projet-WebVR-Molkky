@@ -1,3 +1,4 @@
+import * as THREE from 'three';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
 
 export class XRControllers {
@@ -12,7 +13,17 @@ export class XRControllers {
       grip.add(factory.createControllerModel(grip)); // modèle 3D officiel de la manette
       player.add(grip); // enfant du joueur → suit ses déplacements
 
-      const hand = { grip, gamepad: null, handedness: null, prevButtons: [] };
+            // "ray" = repère du RAYON de visée (pointe vers l'avant de la manette) → menus
+      const ray = renderer.xr.getController(i);
+      const rayLine = new THREE.Line(
+        new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0, -1)]),
+        new THREE.LineBasicMaterial({ color: 0xffffff })
+      );
+      rayLine.visible = false; // affiché seulement quand un menu est ouvert
+      ray.add(rayLine);
+      player.add(ray);
+
+      const hand = { grip, ray, rayLine, gamepad: null, handedness: null, prevButtons: [] };
 
       grip.addEventListener('connected', (e) => {
         hand.gamepad = e.data.gamepad;          // accès aux boutons et à la vibration
