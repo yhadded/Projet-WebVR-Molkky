@@ -9,11 +9,14 @@ import { Molkky, LYING } from './game/Molkky.js';
 import { GrabSystem } from './game/GrabSystem.js';
 import { FallDetector } from './game/FallDetector.js';
 import { GameState } from './game/GameState.js';
+import { AimAssist } from './game/AimAssist.js';
+import { DIFFICULTIES } from './game/difficulty.js';
 import { HUD } from './ui/HUD.js';
 import { Feedback } from './ui/Feedback.js';
-import { CONFIG } from './game/config.js';
+import { Menu } from './ui/Menu.js';
 
 async function init() {
+  // --- Création des modules ---
   const physics = await Physics.create();
   const sm = new SceneManager();
   const terrain = new Terrain(sm.scene, physics);
@@ -23,25 +26,53 @@ async function init() {
   const grab = new GrabSystem(controllers, molkky);
   const fallDetector = new FallDetector(pins, molkky);
   const locomotion = new Locomotion(sm.player, sm.camera, controllers);
-
+  const aimAssist = new AimAssist(sm.scene, grab, molkky);
   const game = new GameState();
   const hud = new HUD(sm.scene);
   const feedback = new Feedback(sm.scene);
+  const menu = new Menu(sm.scene, controllers);
 
-  const d = CONFIG.throwDistance.normal;
-  terrain.setThrowDistance(d);
-  locomotion.setThrowDistance(d);
-  sm.setPlayerPosition(0, d + 0.5);
+  let difficulty = 'normal';
+  let d = DIFFICULTIES[difficulty].distance; // distance quilles → ligne
 
   const resetMolkky = () => molkky.setPose(terrain.molkkySpawn, LYING);
-  resetMolkky();
-    // --- Partie ---
-  const newGame = () => {
+
+  // --- Placement du terrain selon la difficulté ---
+  const applyDistance = (distance) => {
+    d = distance;
+    terrain.setThrowDistance(d);
+    locomotion.setThrowDistance(d);
+    sm.setPlayerPosition(0, d + 0.5);
+    hud.panel.mesh.position.z = d - 2.3; // le tableau suit la zone de lancer
+  };
+
+  // --- Menu ↔ partie ---
+  const openMenu = () => {
+    grab.enabled = false;
+    feedback.hide();
+    hud.panel.mesh.visible = false;
+    applyDistance(DIFFICULTIES[difficulty].distance);
     pins.resetAll();
     resetMolkky();
+    menu.show(d);
+  };
+
+  const startGame = (id) => {
+    difficulty = id;
+    const diff = DIFFICULTIES[id];
+    menu.hide();
+    hud.panel.mesh.visible = true;
+    applyDistance(diff.distance);
+    aimAssist.enabled = diff.aimAssist;
+    pins.resetAll();
+    resetMolkky();
+    grab.enabled = true;
     game.reset();
   };
 
+  menu.onSelect(startGame);
+
+  // --- Boucle de jeu ---
   // 1. Lâcher → on attend le résultat (un seul lancer à la fois)
   grab.onThrow(({ speed }) => {
     if (!game.startThrow()) return;
@@ -55,21 +86,23 @@ async function init() {
     game.resolveThrow(fallen);
   });
 
-  // 3. Score mis à jour → affichage (console pour l'instant, panneau VR à l'étape 8)
-    game.onChange(({ event, points, fallen, state }) => {
+  // 3. Score mis à jour → tableau + message
+  game.onChange(({ event, points, fallen, state }) => {
     hud.render(state, event === 'start' ? null : { points, fallen });
 
-    // Message au-dessus des quilles : [titre, sous-titre, couleur, durée]
+    // [titre, sous-titre, couleur, durée]
+    const label = DIFFICULTIES[difficulty].label;
     const msg = {
-      start: ['Nouvelle partie', 'Atteins 50 points exactement', '#ffffff', 2.5],
+      start: [`Niveau ${label}`, 'Atteins 50 points exactement', '#ffffff', 2.5],
       points: [`+${points}`, fallen.length === 1 ? `Quille ${fallen[0]}` : `${fallen.length} quilles`, '#22c55e', 2],
       miss: ['Raté !', `Échec ${state.misses} / 3`, '#f97316', 2],
       bust: ['Plus de 50 !', 'Retour à 25 points', '#facc15', 2.5],
-      win: ['GAGNÉ !', `50 points en ${state.throws} lancers — B pour rejouer`, '#22c55e', Infinity],
-      lose: ['PERDU', '3 échecs d\'affilée — B pour rejouer', '#ef4444', Infinity],
+      win: ['GAGNÉ !', `50 points en ${state.throws} lancers — B : menu`, '#22c55e', Infinity],
+      lose: ['PERDU', '3 échecs d\'affilée — B : menu', '#ef4444', Infinity],
     }[event];
     feedback.show(...msg);
     console.log(`${msg[0]} — score : ${state.score}`);
+
     // Lancer suivant : Mölkky sur la table + quilles tombées relevées sur place
     if (event !== 'start' && state.status === 'playing') {
       setTimeout(() => {
@@ -81,39 +114,45 @@ async function init() {
   });
 
   // --- Contrôles VR ---
+  // 0 gâchette · 4 A/X · 5 B/Y
   controllers.onButtonDown((hand, i) => {
-    if (i === 4 && !grab.heldBy) resetMolkky(); // A ou X → Mölkky sur la table
-    if (i === 5) newGame();                     // B ou Y → nouvelle partie               // B ou Y → quilles en place
+    if (menu.visible) {
+      if (i === 0) menu.trigger(hand); // gâchette → valide le bouton visé
+      return;
+    }
+    if (i === 4 && !grab.heldBy) resetMolkky(); // A/X → Mölkky sur la table
+    if (i === 5) openMenu();                    // B/Y → retour au menu
   });
 
-  // --- DEBUG clavier (PC) ---
+  // --- Clavier (PC) ---
+  const keyToDifficulty = { 1: 'easy', 2: 'normal', 3: 'hard' };
   addEventListener('keydown', (e) => {
+    if (menu.visible && keyToDifficulty[e.key]) return menu.select(keyToDifficulty[e.key]);
+    if (e.key === 'Escape') openMenu();
     if (e.key === 'r') pins.resetAll();
     if (e.key === 'm') resetMolkky();
     if (e.key === 'b') throwTestBall(physics, sm.scene, d);
-    if (e.key === 't') grab.debugThrow(d);
-    if (e.key === 'n') newGame();
+    if (e.key === 't' && grab.enabled) grab.debugThrow(d);
+    if (e.key === 'n') startGame(difficulty);
   });
 
   // --- Boucle : l'ORDRE compte ---
-  sm.onUpdate(() => controllers.update()); // 1. lire les boutons
-  sm.onUpdate((dt) => locomotion.update(dt));     // 1b. se déplacer (joysticks)
-  sm.onUpdate(() => grab.update());               // 2. cible du bâton tenu
-  sm.onUpdate(() => molkky.updateDamping());      // 3. freinage au sol
-  sm.onUpdate((dt) => physics.update(dt));        // 4. simuler
-  sm.onUpdate(() => grab.lateUpdate());           // 5. caler le visuel sur la main
-  sm.onUpdate((dt) => feedback.update(dt));       // fondu des messages
-  sm.onUpdate((dt) => fallDetector.update(dt));   // 6. attendre l'immobilité    // 4. caler le visuel sur la main
-    sm.renderer.xr.addEventListener('sessionstart', () => {
-    const session = sm.renderer.xr.getSession();
-    console.log('SESSION VR démarrée, état :', session.visibilityState);
-    session.addEventListener('visibilitychange', () =>
-      console.log('ÉTAT VR :', session.visibilityState)
-    );
-  });
+  sm.onUpdate(() => controllers.update());        // 1. lire les boutons
+  sm.onUpdate((dt) => locomotion.update(dt));     // 2. se déplacer (joysticks)
+  sm.onUpdate(() => menu.update());               // 3. survol du menu
+  sm.onUpdate(() => grab.update());               // 4. cible du bâton tenu
+  sm.onUpdate(() => molkky.updateDamping());      // 5. freinage au sol
+  sm.onUpdate((dt) => physics.update(dt));        // 6. simuler
+  sm.onUpdate(() => grab.lateUpdate());           // 7. caler le visuel sur la main
+  sm.onUpdate(() => aimAssist.update());          // 8. trajectoire (mode Facile)
+  sm.onUpdate((dt) => feedback.update(dt));       // 9. fondu des messages
+  sm.onUpdate((dt) => fallDetector.update(dt));   // 10. attendre l'immobilité
+
+  openMenu();
   sm.start();
 }
 
+// Balle de test (touche B sur PC)
 function throwTestBall(physics, scene, d) {
   const { RAPIER, world } = physics;
   const r = 0.05;
