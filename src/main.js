@@ -9,6 +9,8 @@ import { Molkky, LYING } from './game/Molkky.js';
 import { GrabSystem } from './game/GrabSystem.js';
 import { FallDetector } from './game/FallDetector.js';
 import { GameState } from './game/GameState.js';
+import { HUD } from './ui/HUD.js';
+import { Feedback } from './ui/Feedback.js';
 import { CONFIG } from './game/config.js';
 
 async function init() {
@@ -23,6 +25,8 @@ async function init() {
   const locomotion = new Locomotion(sm.player, sm.camera, controllers);
 
   const game = new GameState();
+  const hud = new HUD(sm.scene);
+  const feedback = new Feedback(sm.scene);
 
   const d = CONFIG.throwDistance.normal;
   terrain.setThrowDistance(d);
@@ -52,16 +56,20 @@ async function init() {
   });
 
   // 3. Score mis à jour → affichage (console pour l'instant, panneau VR à l'étape 8)
-  game.onChange(({ event, points, fallen, state }) => {
+    game.onChange(({ event, points, fallen, state }) => {
+    hud.render(state, event === 'start' ? null : { points, fallen });
+
+    // Message au-dessus des quilles : [titre, sous-titre, couleur, durée]
     const msg = {
-      start: 'Nouvelle partie !',
-      points: `+${points} (quilles [${fallen.join(', ')}])`,
-      miss: `Raté ! (${state.misses}/3)`,
-      bust: `Plus de 50 → retour à 25`,
-      win: 'GAGNÉ ! 50 points',
-      lose: 'PERDU : 3 échecs d\'affilée',
+      start: ['Nouvelle partie', 'Atteins 50 points exactement', '#ffffff', 2.5],
+      points: [`+${points}`, fallen.length === 1 ? `Quille ${fallen[0]}` : `${fallen.length} quilles`, '#22c55e', 2],
+      miss: ['Raté !', `Échec ${state.misses} / 3`, '#f97316', 2],
+      bust: ['Plus de 50 !', 'Retour à 25 points', '#facc15', 2.5],
+      win: ['GAGNÉ !', `50 points en ${state.throws} lancers — B pour rejouer`, '#22c55e', Infinity],
+      lose: ['PERDU', '3 échecs d\'affilée — B pour rejouer', '#ef4444', Infinity],
     }[event];
-    console.log(`${msg} — score : ${state.score}`);
+    feedback.show(...msg);
+    console.log(`${msg[0]} — score : ${state.score}`);
     // Lancer suivant : Mölkky sur la table + quilles tombées relevées sur place
     if (event !== 'start' && state.status === 'playing') {
       setTimeout(() => {
@@ -94,6 +102,7 @@ async function init() {
   sm.onUpdate(() => molkky.updateDamping());      // 3. freinage au sol
   sm.onUpdate((dt) => physics.update(dt));        // 4. simuler
   sm.onUpdate(() => grab.lateUpdate());           // 5. caler le visuel sur la main
+  sm.onUpdate((dt) => feedback.update(dt));       // fondu des messages
   sm.onUpdate((dt) => fallDetector.update(dt));   // 6. attendre l'immobilité    // 4. caler le visuel sur la main
     sm.renderer.xr.addEventListener('sessionstart', () => {
     const session = sm.renderer.xr.getSession();
