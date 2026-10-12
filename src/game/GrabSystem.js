@@ -43,7 +43,7 @@ export class GrabSystem {
 
   tryGrab(hand) {
     console.log('GRIP', hand.handedness, 'distance =', this.distanceToMolkky(hand).toFixed(2));
-    if (this.heldBy) return;
+    if (this.heldBy || !this.enabled) return;
     if (this.distanceToMolkky(hand) > CONFIG.grab.radius) return;
 
     this.heldBy = hand;
@@ -56,6 +56,7 @@ export class GrabSystem {
     release(hand) {
     if (this.heldBy !== hand) return;
     this.heldBy = null;
+    this.enabled = true; // false pendant le menu
 
     // Vitesses mesurées sur les 80 dernières ms
     const { powerMultiplier, maxSpeed, maxSpin } = CONFIG.throw;
