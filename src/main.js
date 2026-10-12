@@ -8,6 +8,7 @@ import { Pins } from './game/pins.js';
 import { Molkky, LYING } from './game/Molkky.js';
 import { GrabSystem } from './game/GrabSystem.js';
 import { FallDetector } from './game/FallDetector.js';
+import { GameState } from './game/GameState.js';
 import { CONFIG } from './game/config.js';
 
 async function init() {
@@ -21,13 +22,7 @@ async function init() {
   const fallDetector = new FallDetector(pins, molkky);
   const locomotion = new Locomotion(sm.player, sm.camera, controllers);
 
-  grab.onThrow(({ speed }) => {
-    console.log(`Lancer ! ${speed.toFixed(1)} m/s`);
-    fallDetector.start();
-  });
-  fallDetector.onResult(({ fallen, timedOut }) => {
-    console.log(`Quilles tombées : [${fallen.join(', ')}]${timedOut ? ' (timeout)' : ''}`);
-  });
+  const game = new GameState();
 
   const d = CONFIG.throwDistance.normal;
   terrain.setThrowDistance(d);
@@ -36,11 +31,44 @@ async function init() {
 
   const resetMolkky = () => molkky.setPose(terrain.molkkySpawn, LYING);
   resetMolkky();
+    // --- Partie ---
+  const newGame = () => {
+    pins.resetAll();
+    resetMolkky();
+    game.reset();
+  };
+
+  // 1. Lâcher → on attend le résultat (un seul lancer à la fois)
+  grab.onThrow(({ speed }) => {
+    if (!game.startThrow()) return;
+    console.log(`Lancer ! ${speed.toFixed(1)} m/s`);
+    fallDetector.start();
+  });
+
+  // 2. Tout est immobile → on compte les points
+  fallDetector.onResult(({ fallen, timedOut }) => {
+    if (timedOut) console.warn('Résultat forcé (timeout)');
+    game.resolveThrow(fallen);
+  });
+
+  // 3. Score mis à jour → affichage (console pour l'instant, panneau VR à l'étape 8)
+  game.onChange(({ event, points, fallen, state }) => {
+    const msg = {
+      start: 'Nouvelle partie !',
+      points: `+${points} (quilles [${fallen.join(', ')}])`,
+      miss: `Raté ! (${state.misses}/3)`,
+      bust: `Plus de 50 → retour à 25`,
+      win: 'GAGNÉ ! 50 points',
+      lose: 'PERDU : 3 échecs d\'affilée',
+    }[event];
+    console.log(`${msg} — score : ${state.score}`);
+    if (event !== 'start' && state.status === 'playing') setTimeout(resetMolkky, 1000);
+  });
 
   // --- Contrôles VR ---
   controllers.onButtonDown((hand, i) => {
     if (i === 4 && !grab.heldBy) resetMolkky(); // A ou X → Mölkky sur la table
-    if (i === 5) pins.resetAll();               // B ou Y → quilles en place
+    if (i === 5) newGame();                     // B ou Y → nouvelle partie               // B ou Y → quilles en place
   });
 
   // --- DEBUG clavier (PC) ---
@@ -49,6 +77,7 @@ async function init() {
     if (e.key === 'm') resetMolkky();
     if (e.key === 'b') throwTestBall(physics, sm.scene, d);
     if (e.key === 't') grab.debugThrow(d);
+    if (e.key === 'n') newGame();
   });
 
   // --- Boucle : l'ORDRE compte ---
