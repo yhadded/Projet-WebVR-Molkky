@@ -34,10 +34,11 @@ export function roundRect(ctx, x, y, w, h, r, fill) {
   ctx.fill();
 }
 
-export function text(ctx, str, x, y, size, color = '#fff', align = 'center', weight = 'bold') {
+// maxWidth (optionnel) : le texte est resserré s'il est trop long
+export function text(ctx, str, x, y, size, color = '#fff', align = 'center', weight = 'bold', maxWidth) {
   ctx.font = `${weight} ${size}px sans-serif`;
   ctx.fillStyle = color;
   ctx.textAlign = align;
   ctx.textBaseline = 'middle';
-  ctx.fillText(str, x, y);
+  ctx.fillText(str, x, y, maxWidth);
 }

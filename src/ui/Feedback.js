@@ -14,8 +14,8 @@ export class Feedback {
   show(title, subtitle = '', color = '#ffffff', duration = 2) {
     this.panel.draw((ctx, w, h) => {
       roundRect(ctx, 0, 0, w, h, 40, 'rgba(15, 23, 42, 0.8)');
-      text(ctx, title, w / 2, subtitle ? h * 0.38 : h / 2, 120, color);
-      if (subtitle) text(ctx, subtitle, w / 2, h * 0.75, 52, '#cbd5e1', 'center', 'normal');
+      text(ctx, title, w / 2, subtitle ? h * 0.38 : h / 2, 120, color, 'center', 'bold', w * 0.92);
+      if (subtitle) text(ctx, subtitle, w / 2, h * 0.75, 52, '#cbd5e1', 'center', 'normal', w * 0.92);
     });
     this.timeLeft = duration;
     this.panel.material.opacity = 1;
