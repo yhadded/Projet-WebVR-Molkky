@@ -10,6 +10,8 @@ export class SceneManager {
     this.renderer.shadowMap.enabled = true;
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     this.renderer.xr.enabled = true;
+    this.renderer.xr.setFoveation(1);           // less detail in the periphery (invisible)
+    this.renderer.xr.setFramebufferScaleFactor(0.8); // VR resolution slightly lowered
     document.body.appendChild(this.renderer.domElement);
     document.body.appendChild(VRButton.createButton(this.renderer));
 
@@ -43,7 +45,9 @@ export class SceneManager {
     const sun = new THREE.DirectionalLight(0xffffff, 1.5);
     sun.position.set(4, 8, 3);
     sun.castShadow = true;
-    sun.shadow.mapSize.set(2048, 2048);
+    sun.shadow.bias = -0.0005;
+    sun.shadow.normalBias = 0.02;
+    sun.shadow.mapSize.set(1024, 1024);
     // zone couverte par les ombres : quilles et joueur
     const s = sun.shadow.camera;
     s.left = -6; s.right = 6; s.top = 6; s.bottom = -6;
