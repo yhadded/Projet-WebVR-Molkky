@@ -62,7 +62,14 @@ async function init() {
       lose: 'PERDU : 3 échecs d\'affilée',
     }[event];
     console.log(`${msg} — score : ${state.score}`);
-    if (event !== 'start' && state.status === 'playing') setTimeout(resetMolkky, 1000);
+    // Lancer suivant : Mölkky sur la table + quilles tombées relevées sur place
+    if (event !== 'start' && state.status === 'playing') {
+      setTimeout(() => {
+        resetMolkky();
+        const raised = pins.standUpFallen();
+        if (raised.length) console.log(`Quilles relevées : [${raised.join(', ')}]`);
+      }, 1500);
+    }
   });
 
   // --- Contrôles VR ---

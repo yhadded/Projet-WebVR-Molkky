@@ -79,7 +79,11 @@ export class Pin extends PhysicsObject {
     this.setPose(this.initialPosition);
     this.setHighlight(null);
   }
-
+  // Relève la quille DEBOUT à la position (x, z) donnée, au sol
+  standUpAt(x, z) {
+    this.setPose({ x, y: CONFIG.pin.height / 2, z });
+    this.setHighlight(null);
+  }
   // Inclinaison : composante verticale de l'axe de la quille.
   // 1 = parfaitement debout, 0 = couchée. (axe Y local tourné par le quaternion)
   uprightness() {
