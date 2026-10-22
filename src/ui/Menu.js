@@ -113,7 +113,7 @@ export class Menu {
         ctx.stroke();
         text(ctx, `${i + 1}. ${diff.label}`, w * 0.05, h * 0.36, 52, '#ffffff', 'left');
         text(ctx, diff.description, w * 0.05, h * 0.74, 30, hover ? '#f8fafc' : '#94a3b8', 'left', 'normal');
-        if (this.best[id] != null) text(ctx, `Record : ${this.best[id]}`, w * 0.95, h * 0.36, 34, '#facc15', 'right');
+                if (this.best[id] != null) text(ctx, `★ ${this.best[id]} lancers`, w * 0.95, h * 0.36, 34, '#facc15', 'right');
       });
     });
   }
