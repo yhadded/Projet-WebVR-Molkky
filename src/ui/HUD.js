@@ -1,4 +1,4 @@
-import { Panel, roundRect, text } from './Panel.js';
+import { Panel, roundRect, text, formatTime } from './Panel.js';
 import { RULES } from '../game/Scoring.js';
 
 // Tableau de score fixe, planté à gauche du terrain, tourné vers le joueur
@@ -13,6 +13,21 @@ export class HUD {
 
   // state : état de Scoring ; last : dernier lancer { points, fallen } ou null
   render(state, last) {
+    this.state = state;
+    this.last = last;
+    this._draw();
+  }
+
+  // Chrono : on ne redessine que quand la seconde affichée change
+  setTime(seconds) {
+    const s = Math.floor(seconds);
+    if (s === this.seconds) return;
+    this.seconds = s;
+    if (this.state) this._draw();
+  }
+
+  _draw() {
+    const { state, last } = this;
     this.panel.draw((ctx, w, h) => {
       roundRect(ctx, 0, 0, w, h, 40, 'rgba(20, 28, 40, 0.88)');
 
@@ -37,13 +52,14 @@ export class HUD {
         ctx.fill();
       }
 
-      // --- Lancers + dernier résultat ---
-      text(ctx, `Lancer n° ${state.throws + 1}`, w * 0.75, h * 0.56, 40, '#e2e8f0');
+      // --- Lancers + dernier résultat + chrono ---
+      text(ctx, `Lancer n° ${state.throws + 1}`, w * 0.75, h * 0.52, 40, '#e2e8f0');
+      text(ctx, `⏱ ${formatTime(this.seconds ?? 0)}`, w * 0.75, h * 0.86, 40, '#e2e8f0');
       if (last) {
         const label = last.fallen.length
           ? `Dernier : +${last.points} (${last.fallen.join(', ')})`
           : 'Dernier : raté';
-        text(ctx, label, w * 0.75, h * 0.74, 34, '#9fb3c8');
+        text(ctx, label, w * 0.75, h * 0.68, 34, '#9fb3c8', 'center', 'bold', w * 0.48);
       }
     });
   }

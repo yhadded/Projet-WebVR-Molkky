@@ -13,13 +13,19 @@ export class GameState {
   reset() {
     this.state = newGame();
     this.phase = 'aiming';
-    this.history = []; // tous les lancers de la partie (utile pour l'UI et l'étape 10)
+    this.history = []; // tous les lancers de la partie
+    this.elapsed = 0;  // chronomètre (secondes)
     this._emit({ event: 'start', points: 0, fallen: [] });
   }
 
   // fn({ event, points, fallen, state, phase }) à chaque changement
   onChange(fn) {
     this.listeners.push(fn);
+  }
+
+  // À chaque frame : le chrono avance tant que la partie n'est pas finie
+  tick(dt) {
+    if (this.phase !== 'over') this.elapsed += dt;
   }
 
   canThrow() {
@@ -38,7 +44,7 @@ export class GameState {
     if (this.phase !== 'resolving') return;
     const { state, points, event } = applyThrow(this.state, fallen);
     this.state = state;
-    this.history.push({ fallen, points, event, score: state.score });
+    this.history.push({ throw: state.throws, fallen, points, event, score: state.score });
     this.phase = state.status === 'playing' ? 'aiming' : 'over';
     this._emit({ event, points, fallen });
   }
