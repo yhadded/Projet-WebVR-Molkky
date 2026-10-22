@@ -11,6 +11,8 @@ function makeTexture(width, height, draw) {
   draw(ctx, width, height);
   const tex = new THREE.CanvasTexture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
+  tex.generateMipmaps = false;          // sur Quest, les mipmaps sRGB de ces petites textures sortent noires
+  tex.minFilter = THREE.LinearFilter;   // filtre simple, sans mipmaps
   return tex;
 }
 

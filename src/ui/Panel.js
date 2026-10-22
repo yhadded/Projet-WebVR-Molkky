@@ -42,3 +42,10 @@ export function text(ctx, str, x, y, size, color = '#fff', align = 'center', wei
   ctx.textBaseline = 'middle';
   ctx.fillText(str, x, y, maxWidth);
 }
+
+
+// 83 → "01:23"
+export function formatTime(seconds) {
+  const s = Math.floor(seconds);
+  return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`;
+}

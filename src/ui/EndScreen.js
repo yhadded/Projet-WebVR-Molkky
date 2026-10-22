@@ -1,4 +1,4 @@
-import { Panel, roundRect, text } from './Panel.js';
+import { Panel, roundRect, text, formatTime } from './Panel.js';
 
 const MAX_ROWS = 12; // lignes affichées (les derniers lancers)
 
@@ -18,14 +18,14 @@ export class EndScreen {
   }
 
   // result : 'won' | 'lost' ; history : [{ fallen, points, event, score }]
-  show({ result, history, throws, best, isNewRecord, difficultyLabel }) {
+  show({ result, history, score, throws, time, best, isNewRecord, difficultyLabel }) {
     this.panel.draw((ctx, w, h) => {
       roundRect(ctx, 0, 0, w, h, 40, 'rgba(15, 23, 42, 0.92)');
 
       // --- En-tête ---
       const won = result === 'won';
       text(ctx, won ? 'VICTOIRE' : 'DÉFAITE', w / 2, h * 0.07, 64, won ? '#22c55e' : '#ef4444');
-      text(ctx, `${difficultyLabel} · ${throws} lancers`, w / 2, h * 0.14, 34, '#cbd5e1', 'center', 'normal');
+            text(ctx, `${difficultyLabel} · ${score} pts · ${throws} lancers · ${formatTime(time)}`, w / 2, h * 0.14, 34, '#cbd5e1', 'center', 'normal', w * 0.92);
 
       // --- Tableau des lancers ---
       const top = h * 0.21;
@@ -50,7 +50,7 @@ export class EndScreen {
         ? `★ Nouveau record : ${throws} lancers !`
         : best !== null ? `Record : ${best} lancers` : 'Pas encore de record';
       text(ctx, recordText, w / 2, h * 0.88, 40, isNewRecord ? '#facc15' : '#94a3b8', 'center', 'bold', w * 0.9);
-      text(ctx, 'B : retour au menu', w / 2, h * 0.95, 30, '#64748b', 'center', 'normal');
+      text(ctx, 'A : rejouer · B : menu', w / 2, h * 0.95, 30, '#64748b', 'center', 'normal');
     });
     this.panel.mesh.visible = true;
   }
