@@ -14,6 +14,8 @@ import { DIFFICULTIES } from './game/difficulty.js';
 import { HUD } from './ui/HUD.js';
 import { Feedback } from './ui/Feedback.js';
 import { Menu } from './ui/Menu.js';
+import { EndScreen } from './ui/EndScreen.js';
+import { Storage } from './data/Storage.js';
 
 async function init() {
   // --- Création des modules ---
@@ -31,6 +33,8 @@ async function init() {
   const hud = new HUD(sm.scene);
   const feedback = new Feedback(sm.scene);
   const menu = new Menu(sm.scene, controllers);
+  const endScreen = new EndScreen(sm.scene);
+  const storage = new Storage();
 
   let difficulty = 'normal';
   let d = DIFFICULTIES[difficulty].distance; // distance quilles → ligne
@@ -44,13 +48,16 @@ async function init() {
     locomotion.setThrowDistance(d);
     sm.setPlayerPosition(0, d + 0.5);
     hud.panel.mesh.position.z = d - 2.3; // le tableau suit la zone de lancer
+    endScreen.setThrowDistance(d);
   };
 
   // --- Menu ↔ partie ---
   const openMenu = () => {
     grab.enabled = false;
     feedback.hide();
+    endScreen.hide();
     hud.panel.mesh.visible = false;
+    menu.best = storage.getAllBest(); // records à jour sur les boutons
     applyDistance(DIFFICULTIES[difficulty].distance);
     pins.resetAll();
     resetMolkky();
@@ -61,6 +68,7 @@ async function init() {
     difficulty = id;
     const diff = DIFFICULTIES[id];
     menu.hide();
+    endScreen.hide();
     hud.panel.mesh.visible = true;
     applyDistance(diff.distance);
     aimAssist.enabled = diff.aimAssist;
@@ -102,6 +110,25 @@ async function init() {
     }[event];
     feedback.show(...msg);
     console.log(`${msg[0]} — score : ${state.score}`);
+    
+    // Fin de partie → sauvegarde + récapitulatif
+    if (state.status !== 'playing') {
+      const { isNewRecord } = storage.saveGame({
+        difficulty,
+        result: state.status,
+        score: state.score,
+        throws: state.throws,
+        history: game.history,
+      });
+      endScreen.show({
+        result: state.status,
+        history: game.history,
+        throws: state.throws,
+        best: storage.getBest(difficulty),
+        isNewRecord,
+        difficultyLabel: label,
+      });
+    }
 
     // Lancer suivant : Mölkky sur la table + quilles tombées relevées sur place
     if (event !== 'start' && state.status === 'playing') {
