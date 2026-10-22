@@ -16,6 +16,7 @@ import { Feedback } from './ui/Feedback.js';
 import { Menu } from './ui/Menu.js';
 import { EndScreen } from './ui/EndScreen.js';
 import { Storage } from './data/Storage.js';
+import { AudioManager } from './audio/AudioManager.js';
 
 async function init() {
   // --- Création des modules ---
@@ -35,6 +36,7 @@ async function init() {
   const menu = new Menu(sm.scene, controllers);
   const endScreen = new EndScreen(sm.scene);
   const storage = new Storage();
+  const audio = new AudioManager(sm.camera, sm.scene);
 
   let difficulty = 'normal';
   let d = DIFFICULTIES[difficulty].distance; // distance quilles → ligne
@@ -78,12 +80,26 @@ async function init() {
     game.reset();
   };
 
-  menu.onSelect(startGame);
+    menu.onSelect((id) => {
+    audio.play2D('click');
+    startGame(id);
+  });
+
+  // --- Sons ---
+  // Le navigateur n'autorise le son qu'après une action de l'utilisateur
+  const unlockAudio = () => audio.unlock();
+  addEventListener('pointerdown', unlockAudio);
+  addEventListener('keydown', unlockAudio);
+  sm.renderer.xr.addEventListener('sessionstart', unlockAudio);
+
+  // Chocs (quilles, Mölkky, sol) → "toc" de bois à l'endroit du choc
+  physics.onContact(({ id, position, force }) => audio.impact(id, position, force));
 
   // --- Boucle de jeu ---
   // 1. Lâcher → on attend le résultat (un seul lancer à la fois)
   grab.onThrow(({ speed }) => {
     if (!game.startThrow()) return;
+    audio.play3D('whoosh', molkky.body.translation(), Math.min(1, speed / 6));
     console.log(`Lancer ! ${speed.toFixed(1)} m/s`);
     fallDetector.start();
   });
@@ -109,6 +125,8 @@ async function init() {
       lose: ['PERDU', '3 échecs d\'affilée — B : menu', '#ef4444', Infinity],
     }[event];
     feedback.show(...msg);
+    const sound = { points: 'points', miss: 'miss', bust: 'bust', win: 'win', lose: 'lose' }[event];
+    if (sound) audio.play2D(sound);
     console.log(`${msg[0]} — score : ${state.score}`);
     
     // Fin de partie → sauvegarde + récapitulatif

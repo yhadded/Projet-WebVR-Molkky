@@ -20,6 +20,9 @@ export class PhysicsObject {
 
     this.body = physics.world.createRigidBody(bodyDesc);
     this.collider = physics.world.createCollider(colliderDesc, this.body);
+      // Signale les chocs plus forts que le seuil (au repos ≈ 8 N, une quille qui tombe ≈ 12-16 N)
+    this.collider.setActiveEvents(physics.RAPIER.ActiveEvents.CONTACT_FORCE_EVENTS);
+    this.collider.setContactForceEventThreshold(10);
     physics.link(mesh, this.body); // synchro automatique à chaque frame
   }
 
