@@ -42,7 +42,6 @@ export class GrabSystem {
   }
 
   tryGrab(hand) {
-    console.log('GRIP', hand.handedness, 'distance =', this.distanceToMolkky(hand).toFixed(2));
     if (this.heldBy || !this.enabled) return;
     if (this.distanceToMolkky(hand) > CONFIG.grab.radius) return;
 

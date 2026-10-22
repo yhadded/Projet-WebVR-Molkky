@@ -53,7 +53,7 @@ export class FallDetector {
       .map((pin) => pin.number)
       .sort((a, b) => a - b);
 
-    fallen.forEach((n) => this.pins.get(n).setHighlight(0x661111)); // feedback visuel rouge
+    fallen.forEach((n) => this.pins.get(n).setHighlight(0xaa2222)); // feedback visuel rouge
     this.listeners.forEach((fn) => fn({ fallen, timedOut }));
   }
 }

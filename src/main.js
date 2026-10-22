@@ -121,12 +121,12 @@ async function init() {
       points: [`+${points}`, fallen.length === 1 ? `Quille ${fallen[0]}` : `${fallen.length} quilles`, '#22c55e', 2],
       miss: ['Raté !', `Échec ${state.misses} / 3`, '#f97316', 2],
       bust: ['Plus de 50 !', 'Retour à 25 points', '#facc15', 2.5],
-      win: ['GAGNÉ !', `50 points en ${state.throws} lancers — B : menu`, '#22c55e', Infinity],
-      lose: ['PERDU', '3 échecs d\'affilée — B : menu', '#ef4444', Infinity],
+      win: ['GAGNÉ !', `50 points en ${state.throws} lancers — A : rejouer · B : menu`, '#22c55e', Infinity],
+      lose: ['PERDU', '3 échecs d\'affilée — A : rejouer · B : menu', '#ef4444', Infinity],
     }[event];
     feedback.show(...msg);
     const sound = { points: 'points', miss: 'miss', bust: 'bust', win: 'win', lose: 'lose' }[event];
-    if (sound) audio.play2D(sound);
+    if (sound) audio.play3D(sound, feedback.panel.mesh.position, 0.8); // jingle spatialisé, au-dessus des quilles
     console.log(`${msg[0]} — score : ${state.score}`);
     
     // Fin de partie → sauvegarde + récapitulatif
@@ -136,12 +136,15 @@ async function init() {
         result: state.status,
         score: state.score,
         throws: state.throws,
+        time: Math.round(game.elapsed),
         history: game.history,
       });
       endScreen.show({
         result: state.status,
         history: game.history,
+        score: state.score,
         throws: state.throws,
+        time: game.elapsed,
         best: storage.getBest(difficulty),
         isNewRecord,
         difficultyLabel: label,
@@ -165,6 +168,7 @@ async function init() {
       if (i === 0) menu.trigger(hand); // gâchette → valide le bouton visé
       return;
     }
+    if (i === 4 && game.phase === 'over') return startGame(difficulty); // A/X en fin de partie → rejouer
     if (i === 4 && !grab.heldBy) resetMolkky(); // A/X → Mölkky sur la table
     if (i === 5) openMenu();                    // B/Y → retour au menu
   });
@@ -192,6 +196,11 @@ async function init() {
   sm.onUpdate(() => aimAssist.update());          // 8. trajectoire (mode Facile)
   sm.onUpdate((dt) => feedback.update(dt));       // 9. fondu des messages
   sm.onUpdate((dt) => fallDetector.update(dt));   // 10. attendre l'immobilité
+  sm.onUpdate((dt) => {                           // 11. chronomètre (arrêté pendant le menu)
+    if (menu.visible) return;
+    game.tick(dt);
+    hud.setTime(game.elapsed);
+  });
 
   openMenu();
   sm.start();
