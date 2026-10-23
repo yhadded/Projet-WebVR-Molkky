@@ -204,6 +204,9 @@ async function init() {
   });
 
   openMenu();
+  // Compile tous les shaders dès le chargement (en tâche de fond) :
+  // sinon le casque les compile au moment d'entrer en VR → écran figé quelques secondes
+  sm.renderer.compileAsync(sm.scene, sm.camera).catch(() => {});
   sm.start();
 }
 
