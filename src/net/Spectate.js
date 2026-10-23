@@ -4,13 +4,18 @@ import mqtt from 'mqtt';
 // GitHub Pages ne peut pas servir de relais → on passe par un serveur MQTT public (gratuit).
 // Les messages traversent Internet : ça marche même si le Wi-Fi isole les appareils.
 // Seules des positions et des scores sont envoyés (aucune donnée personnelle).
-const DEFAULT_BROKER = 'wss://broker.hivemq.com:8884/mqtt';
+// Deux serveurs en parallèle : si le réseau (école…) bloque le port 8884,
+// le second passe par le port 443, le même que n'importe quel site web.
+const DEFAULT_BROKERS = [
+  'wss://broker.hivemq.com:8884/mqtt',
+  'wss://public:public@public.cloud.shiftr.io',
+];
 const PREFIX = 'molkky-vr-efrei';
 
 const params = new URLSearchParams(location.search);
 
 // ?broker=… permet de tester avec un autre serveur
-export const brokerUrl = () => params.get('broker') || DEFAULT_BROKER;
+export const brokerUrls = () => (params.get('broker') ? [params.get('broker')] : DEFAULT_BROKERS);
 
 // Code à 4 chiffres, gardé d'une visite à l'autre (le lien du prof reste valable)
 export function roomCode() {
@@ -26,26 +31,29 @@ export function roomCode() {
 // Lien à ouvrir sur le PC du prof (sans code : la page trouve le casque toute seule)
 export const spectatorUrl = () => `${location.origin}${location.pathname}?spectateur`;
 
-const connect = () => mqtt.connect(brokerUrl(), { reconnectPeriod: 2000, connectTimeout: 8000 });
+const connectAll = () =>
+  brokerUrls().map((url) => mqtt.connect(url, { reconnectPeriod: 2000, connectTimeout: 8000 }));
 
 // --- Côté casque ---
 export class Broadcaster {
   constructor(code) {
     this.stateTopic = `${PREFIX}/${code}/state`;
     this.eventTopic = `${PREFIX}/${code}/event`;
-    this.client = connect();
-    this.client.on('error', () => {}); // pas de spectateur = pas grave, le jeu continue
+    this.clients = connectAll();
+    for (const c of this.clients) c.on('error', () => {}); // pas de spectateur = pas grave, le jeu continue
   }
 
   // Positions : envoyées en continu, on peut en perdre
   sendState(state) {
-    if (this.client.connected) this.client.publish(this.stateTopic, JSON.stringify(state));
+    const msg = JSON.stringify(state);
+    for (const c of this.clients) if (c.connected) c.publish(this.stateTopic, msg);
   }
 
   // Score, messages, fin de partie : gardé par le serveur (retain)
   // → un spectateur qui arrive en cours de partie voit tout de suite le score
   sendEvent(event) {
-    if (this.client.connected) this.client.publish(this.eventTopic, JSON.stringify(event), { retain: true, qos: 1 });
+    const msg = JSON.stringify(event);
+    for (const c of this.clients) if (c.connected) c.publish(this.eventTopic, msg, { retain: true, qos: 1 });
   }
 }
 
@@ -55,21 +63,33 @@ export class Broadcaster {
 export class Receiver {
   constructor(code, { onState, onEvent, onStatus }) {
     const room = code || '+'; // '+' = joker MQTT : n'importe quel code
-    this.client = connect();
-    this.client.on('connect', () => {
-      onStatus('waiting');
-      this.client.subscribe([`${PREFIX}/${room}/state`, `${PREFIX}/${room}/event`]);
-    });
-    this.client.on('reconnect', () => onStatus('connecting'));
-    this.client.on('offline', () => onStatus('offline'));
-    this.client.on('error', () => onStatus('offline'));
-    this.client.on('message', (topic, payload) => {
-      const [, from, kind] = topic.split('/'); // molkky-vr-efrei/<code>/<state|event>
-      let data;
-      try { data = JSON.parse(payload.toString()); } catch { return; }
-      if (kind === 'state') onState(from, data);
-      else if (kind === 'event') onEvent(from, data);
-    });
+    this.clients = connectAll();
+    // Statut global : connecté dès qu'au moins un serveur répond
+    const report = (fallback) => () =>
+      onStatus(this.clients.some((c) => c.connected) ? 'waiting' : fallback);
+    // Le même message peut arriver par les deux serveurs : on ignore les doublons
+    let lastEvent = '';
+    for (const client of this.clients) {
+      client.on('connect', () => {
+        client.subscribe([`${PREFIX}/${room}/state`, `${PREFIX}/${room}/event`]);
+        report('waiting')();
+      });
+      client.on('reconnect', report('connecting'));
+      client.on('offline', report('offline'));
+      client.on('error', report('offline'));
+      client.on('message', (topic, payload) => {
+        const [, from, kind] = topic.split('/'); // molkky-vr-efrei/<code>/<state|event>
+        const text = payload.toString();
+        let data;
+        try { data = JSON.parse(text); } catch { return; }
+        if (kind === 'state') onState(from, data);
+        else if (kind === 'event') {
+          if (from + text === lastEvent) return;
+          lastEvent = from + text;
+          onEvent(from, data);
+        }
+      });
+    }
   }
 }
 
