@@ -53,7 +53,7 @@ export const CONFIG = {
 
     throw: {
     sampleWindowMs: 80,    // fenêtre d'historique pour calculer la vitesse
-    powerMultiplier: 1.0,  // à augmenter (1.2–1.5) si les lancers semblent trop mous en VR
+    powerMultiplier: 1.5,  // en VR on retient son bras dans le vide → lancers trop courts sans ça
     maxSpeed: 15,          // m/s : plafond anti-bug (pic de tracking)
     maxSpin: 30,           // rad/s : idem pour la rotation
   },
