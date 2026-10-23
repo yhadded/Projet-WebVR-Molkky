@@ -9,7 +9,6 @@ import { Molkky, LYING } from './game/Molkky.js';
 import { GrabSystem } from './game/GrabSystem.js';
 import { FallDetector } from './game/FallDetector.js';
 import { GameState } from './game/GameState.js';
-import { AimAssist } from './game/AimAssist.js';
 import { DIFFICULTIES } from './game/difficulty.js';
 import { HUD } from './ui/HUD.js';
 import { Feedback } from './ui/Feedback.js';
@@ -17,8 +16,16 @@ import { Menu } from './ui/Menu.js';
 import { EndScreen } from './ui/EndScreen.js';
 import { Storage } from './data/Storage.js';
 import { AudioManager } from './audio/AudioManager.js';
+import { Broadcaster, roomCode, spectatorUrl, packPose } from './net/Spectate.js';
 
 async function init() {
+  // Page spectateur (?spectateur=1234) : on rejoue la partie du casque au lieu de jouer
+  const params = new URLSearchParams(location.search);
+  if (params.has('spectateur')) {
+    const { runSpectator } = await import('./spectator/SpectatorView.js');
+    return runSpectator(params.get('spectateur') || null); // sans code : casque trouvé automatiquement
+  }
+
   // --- Création des modules ---
   const physics = await Physics.create();
   const sm = new SceneManager();
@@ -29,7 +36,6 @@ async function init() {
   const grab = new GrabSystem(controllers, molkky);
   const fallDetector = new FallDetector(pins, molkky);
   const locomotion = new Locomotion(sm.player, sm.camera, controllers);
-  const aimAssist = new AimAssist(sm.scene, grab, molkky);
   const game = new GameState();
   const hud = new HUD(sm.scene);
   const feedback = new Feedback(sm.scene);
@@ -37,6 +43,11 @@ async function init() {
   const endScreen = new EndScreen(sm.scene);
   const storage = new Storage();
   const audio = new AudioManager(sm.camera, sm.scene);
+
+  // --- Mode spectateur : le casque diffuse la partie ---
+  const room = roomCode();
+  const net = new Broadcaster(room);
+  showSpectatorLink();
 
   let difficulty = 'normal';
   let d = DIFFICULTIES[difficulty].distance; // distance quilles → ligne
@@ -73,7 +84,6 @@ async function init() {
     endScreen.hide();
     hud.panel.mesh.visible = true;
     applyDistance(diff.distance);
-    aimAssist.enabled = diff.aimAssist;
     pins.resetAll();
     resetMolkky();
     grab.enabled = true;
@@ -91,6 +101,11 @@ async function init() {
   addEventListener('pointerdown', unlockAudio);
   addEventListener('keydown', unlockAudio);
   sm.renderer.xr.addEventListener('sessionstart', unlockAudio);
+
+  // --- Quilles noires dans le casque ---
+  // Au passage en VR (ou si le GPU perd le contexte), on renvoie les textures des numéros
+  sm.renderer.xr.addEventListener('sessionstart', () => setTimeout(() => pins.refreshTextures(), 300));
+  sm.renderer.domElement.addEventListener('webglcontextrestored', () => pins.refreshTextures());
 
   // Chocs (quilles, Mölkky, sol) → "toc" de bois à l'endroit du choc
   physics.onContact(({ id, position, force }) => audio.impact(id, position, force));
@@ -130,6 +145,7 @@ async function init() {
     console.log(`${msg[0]} — score : ${state.score}`);
     
     // Fin de partie → sauvegarde + récapitulatif
+    let end = null;
     if (state.status !== 'playing') {
       const { isNewRecord } = storage.saveGame({
         difficulty,
@@ -139,7 +155,7 @@ async function init() {
         time: Math.round(game.elapsed),
         history: game.history,
       });
-      endScreen.show({
+      end = {
         result: state.status,
         history: game.history,
         score: state.score,
@@ -148,8 +164,12 @@ async function init() {
         best: storage.getBest(difficulty),
         isNewRecord,
         difficultyLabel: label,
-      });
+      };
+      endScreen.show(end);
     }
+
+    // Spectateur : score, message et récapitulatif
+    net.sendEvent({ state, last: event === 'start' ? null : { points, fallen }, msg, end, at: Date.now() });
 
     // Lancer suivant : Mölkky sur la table + quilles tombées relevées sur place
     if (event !== 'start' && state.status === 'playing') {
@@ -193,17 +213,59 @@ async function init() {
   sm.onUpdate(() => molkky.updateDamping());      // 5. freinage au sol
   sm.onUpdate((dt) => physics.update(dt));        // 6. simuler
   sm.onUpdate(() => grab.lateUpdate());           // 7. caler le visuel sur la main
-  sm.onUpdate(() => aimAssist.update());          // 8. trajectoire (mode Facile)
-  sm.onUpdate((dt) => feedback.update(dt));       // 9. fondu des messages
-  sm.onUpdate((dt) => fallDetector.update(dt));   // 10. attendre l'immobilité
-  sm.onUpdate((dt) => {                           // 11. chronomètre (arrêté pendant le menu)
+  sm.onUpdate((dt) => feedback.update(dt));       // 8. fondu des messages
+  sm.onUpdate((dt) => fallDetector.update(dt));   // 9. attendre l'immobilité
+  sm.onUpdate((dt) => {                           // 10. chronomètre (arrêté pendant le menu)
     if (menu.visible) return;
     game.tick(dt);
     hud.setTime(game.elapsed);
   });
 
+  // --- Spectateur : positions envoyées 15 fois par seconde ---
+  const _p = new THREE.Vector3();
+  const _q = new THREE.Quaternion();
+  const worldPose = (obj) => {
+    obj.getWorldPosition(_p);
+    obj.getWorldQuaternion(_q);
+    return packPose(_p, _q);
+  };
+  const handPose = (side) => {
+    const hand = controllers.hands.find((h) => h.handedness === side && h.gamepad);
+    return hand ? worldPose(hand.grip) : null;
+  };
+  let netTimer = 0;
+  sm.onUpdate((dt) => {                           // 11. diffusion au spectateur
+    netTimer += dt;
+    if (netTimer < 1 / 15) return;
+    netTimer = 0;
+    net.sendState({
+      d,
+      m: menu.visible ? 1 : 0,
+      t: Math.floor(game.elapsed),
+      h: worldPose(sm.camera),
+      l: handPose('left'),
+      r: handPose('right'),
+      k: packPose(molkky.mesh.position, molkky.mesh.quaternion),
+      p: pins.list.flatMap((pin) => packPose(pin.mesh.position, pin.mesh.quaternion)),
+      hl: pins.list.filter((pin) => pin.mesh.material[0].emissive.getHex() !== 0).map((pin) => pin.number),
+    });
+  });
+
   openMenu();
+  // Compile tous les shaders dès le chargement (en tâche de fond) :
+  // sinon le casque les compile au moment d'entrer en VR → écran figé quelques secondes
+  sm.renderer.compileAsync(sm.scene, sm.camera).catch(() => {});
   sm.start();
+}
+
+// Lien de la page spectateur, affiché en bas de la page sur PC
+function showSpectatorLink() {
+  const link = spectatorUrl();
+  const box = document.createElement('div');
+  box.style.cssText = `position:fixed;left:16px;bottom:16px;font:14px system-ui,sans-serif;color:#e2e8f0;
+    background:rgba(15,23,42,.75);padding:8px 12px;border-radius:10px`;
+  box.innerHTML = `Spectateur : <a href="${link}" target="_blank" style="color:#facc15">${link}</a>`;
+  document.body.appendChild(box);
 }
 
 // Balle de test (touche B sur PC)

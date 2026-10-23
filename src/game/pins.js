@@ -54,6 +54,11 @@ export class Pins {
     return fallen.map((pin) => pin.number);
   }
 
+  // Redessine les numéros de toutes les quilles (voir Pin.refreshTextures)
+  refreshTextures() {
+    this.list.forEach((pin) => pin.refreshTextures());
+  }
+
   resetAll() {
     this.list.forEach((pin) => pin.resetToInitial());
   }

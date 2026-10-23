@@ -7,9 +7,15 @@ function makeTexture(width, height, draw) {
   const canvas = document.createElement('canvas');
   canvas.width = width;
   canvas.height = height;
-  const ctx = canvas.getContext('2d');
+  // willReadFrequently : le canvas reste en mémoire CPU → son contenu survit au passage en VR
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
   draw(ctx, width, height);
   const tex = new THREE.CanvasTexture(canvas);
+  // Redessine le canvas et renvoie la texture au GPU (appelé au lancement de la VR)
+  tex.userData.redraw = () => {
+    draw(ctx, width, height);
+    tex.needsUpdate = true;
+  };
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.generateMipmaps = false;          // sur Quest, les mipmaps sRGB de ces petites textures sortent noires
   tex.minFilter = THREE.LinearFilter;   // filtre simple, sans mipmaps
@@ -74,6 +80,12 @@ export class Pin extends PhysicsObject {
 
     this.number = number;
     this.initialPosition = start;
+    this.textures = [sideTex, topTex];
+  }
+
+  // Les textures canvas peuvent être perdues quand le casque prend le relais (quilles noires)
+  refreshTextures() {
+    this.textures.forEach((tex) => tex.userData.redraw());
   }
 
   // Remet la quille à sa place de départ (nouvelle partie)

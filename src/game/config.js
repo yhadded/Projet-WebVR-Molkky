@@ -48,12 +48,12 @@ export const CONFIG = {
 
   grab: {
     radius: 0.3,               // distance max main ↔ centre du bâton pour saisir
-    offset: [0, 0, -0.04],     // position du bâton dans la main (repère de la manette)
+    holdFromEnd: 0.03,         // on tient le bâton par le bout : 3 cm entre la main et l'extrémité
   },
 
     throw: {
     sampleWindowMs: 80,    // fenêtre d'historique pour calculer la vitesse
-    powerMultiplier: 1.0,  // à augmenter (1.2–1.5) si les lancers semblent trop mous en VR
+    powerMultiplier: 1.5,  // en VR on retient son bras dans le vide → lancers trop courts sans ça
     maxSpeed: 15,          // m/s : plafond anti-bug (pic de tracking)
     maxSpin: 30,           // rad/s : idem pour la rotation
   },
