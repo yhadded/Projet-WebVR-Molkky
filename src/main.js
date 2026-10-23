@@ -16,8 +16,17 @@ import { Menu } from './ui/Menu.js';
 import { EndScreen } from './ui/EndScreen.js';
 import { Storage } from './data/Storage.js';
 import { AudioManager } from './audio/AudioManager.js';
+import { Panel, roundRect, text } from './ui/Panel.js';
+import { Broadcaster, roomCode, spectatorUrl, packPose } from './net/Spectate.js';
 
 async function init() {
+  // Page spectateur (?spectateur=1234) : on rejoue la partie du casque au lieu de jouer
+  const spectate = new URLSearchParams(location.search).get('spectateur');
+  if (spectate) {
+    const { runSpectator } = await import('./spectator/SpectatorView.js');
+    return runSpectator(spectate);
+  }
+
   // --- Création des modules ---
   const physics = await Physics.create();
   const sm = new SceneManager();
@@ -35,6 +44,11 @@ async function init() {
   const endScreen = new EndScreen(sm.scene);
   const storage = new Storage();
   const audio = new AudioManager(sm.camera, sm.scene);
+
+  // --- Mode spectateur : le casque diffuse la partie ---
+  const room = roomCode();
+  const net = new Broadcaster(room);
+  showSpectatorCode(room, menu);
 
   let difficulty = 'normal';
   let d = DIFFICULTIES[difficulty].distance; // distance quilles → ligne
@@ -132,6 +146,7 @@ async function init() {
     console.log(`${msg[0]} — score : ${state.score}`);
     
     // Fin de partie → sauvegarde + récapitulatif
+    let end = null;
     if (state.status !== 'playing') {
       const { isNewRecord } = storage.saveGame({
         difficulty,
@@ -141,7 +156,7 @@ async function init() {
         time: Math.round(game.elapsed),
         history: game.history,
       });
-      endScreen.show({
+      end = {
         result: state.status,
         history: game.history,
         score: state.score,
@@ -150,8 +165,12 @@ async function init() {
         best: storage.getBest(difficulty),
         isNewRecord,
         difficultyLabel: label,
-      });
+      };
+      endScreen.show(end);
     }
+
+    // Spectateur : score, message et récapitulatif
+    net.sendEvent({ state, last: event === 'start' ? null : { points, fallen }, msg, end, at: Date.now() });
 
     // Lancer suivant : Mölkky sur la table + quilles tombées relevées sur place
     if (event !== 'start' && state.status === 'playing') {
@@ -203,8 +222,56 @@ async function init() {
     hud.setTime(game.elapsed);
   });
 
+  // --- Spectateur : positions envoyées 15 fois par seconde ---
+  const _p = new THREE.Vector3();
+  const _q = new THREE.Quaternion();
+  const worldPose = (obj) => {
+    obj.getWorldPosition(_p);
+    obj.getWorldQuaternion(_q);
+    return packPose(_p, _q);
+  };
+  const handPose = (side) => {
+    const hand = controllers.hands.find((h) => h.handedness === side && h.gamepad);
+    return hand ? worldPose(hand.grip) : null;
+  };
+  let netTimer = 0;
+  sm.onUpdate((dt) => {                           // 11. diffusion au spectateur
+    netTimer += dt;
+    if (netTimer < 1 / 15) return;
+    netTimer = 0;
+    net.sendState({
+      d,
+      m: menu.visible ? 1 : 0,
+      t: Math.floor(game.elapsed),
+      h: worldPose(sm.camera),
+      l: handPose('left'),
+      r: handPose('right'),
+      k: packPose(molkky.mesh.position, molkky.mesh.quaternion),
+      p: pins.list.flatMap((pin) => packPose(pin.mesh.position, pin.mesh.quaternion)),
+      hl: pins.list.filter((pin) => pin.mesh.material[0].emissive.getHex() !== 0).map((pin) => pin.number),
+    });
+  });
+
   openMenu();
   sm.start();
+}
+
+// Code spectateur : sous le menu dans le casque + lien sur la page du PC
+function showSpectatorCode(code, menu) {
+  const sign = new Panel(1.0, 0.13);
+  sign.draw((ctx, w, h) => {
+    roundRect(ctx, 0, 0, w, h, 24, 'rgba(15, 23, 42, 0.85)');
+    text(ctx, `Code spectateur : ${code}`, w / 2, h / 2, 34, '#facc15', 'center', 'normal');
+  });
+  sign.mesh.position.set(0, -0.6, 0); // sous les 3 boutons
+  menu.group.add(sign.mesh);
+
+  const link = spectatorUrl(code);
+  const box = document.createElement('div');
+  box.style.cssText = `position:fixed;left:16px;bottom:16px;font:14px system-ui,sans-serif;color:#e2e8f0;
+    background:rgba(15,23,42,.75);padding:8px 12px;border-radius:10px`;
+  box.innerHTML = `Spectateur : code <b>${code}</b> · <a href="${link}" target="_blank" style="color:#facc15">${link}</a>`;
+  document.body.appendChild(box);
 }
 
 // Balle de test (touche B sur PC)
