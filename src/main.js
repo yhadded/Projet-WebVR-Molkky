@@ -92,6 +92,11 @@ async function init() {
   addEventListener('keydown', unlockAudio);
   sm.renderer.xr.addEventListener('sessionstart', unlockAudio);
 
+  // --- Quilles noires dans le casque ---
+  // Au passage en VR (ou si le GPU perd le contexte), on renvoie les textures des numéros
+  sm.renderer.xr.addEventListener('sessionstart', () => setTimeout(() => pins.refreshTextures(), 300));
+  sm.renderer.domElement.addEventListener('webglcontextrestored', () => pins.refreshTextures());
+
   // Chocs (quilles, Mölkky, sol) → "toc" de bois à l'endroit du choc
   physics.onContact(({ id, position, force }) => audio.impact(id, position, force));
 
