@@ -31,6 +31,12 @@ export class Menu {
       return { id, diff, panel };
     });
 
+    // --- Bouton « Pseudo » sous les niveaux (ouvre le clavier virtuel) ---
+    this.pseudoBtn = new Panel(1.0, 0.13);
+    this.pseudoBtn.mesh.position.set(0, -0.6, 0);
+    this.pseudoBtn.mesh.userData.buttonId = 'pseudo';
+    this.group.add(this.pseudoBtn.mesh);
+
     // --- Panneaux latéraux, tournés vers le joueur ---
     // gauche : règles et commandes · droite : records et dernières parties
     this.help = new Panel(0.85, 1.15, 768);
@@ -50,7 +56,13 @@ export class Menu {
     this._redraw();
   }
 
-  // fn(difficultyId) quand un niveau est choisi
+  // Cache les boutons pendant que le clavier virtuel est ouvert
+  setButtonsVisible(on) {
+    this.buttons.forEach((b) => (b.panel.mesh.visible = on));
+    this.pseudoBtn.mesh.visible = on;
+  }
+
+  // fn(id) quand un bouton est choisi : 'easy' | 'normal' | 'hard' | 'pseudo'
   onSelect(fn) {
     this.listeners.push(fn);
   }
@@ -97,7 +109,7 @@ export class Menu {
     hand.ray.getWorldQuaternion(_quat);
     _dir.set(0, 0, -1).applyQuaternion(_quat); // le rayon part vers l'avant de la manette
     this.raycaster.set(_origin, _dir);
-    const hit = this.raycaster.intersectObjects(this.buttons.map((b) => b.panel.mesh))[0];
+    const hit = this.raycaster.intersectObjects([...this.buttons.map((b) => b.panel.mesh), this.pseudoBtn.mesh])[0];
     hand.rayLine.scale.z = hit ? hit.distance : 3; // le rayon s'arrête sur le bouton
     return hit ? hit.object.userData.buttonId : null;
   }
@@ -148,7 +160,7 @@ export class Menu {
       text(ctx, `Joueur : ${this.player || 'Joueur'}`, w / 2, 122, 30, '#cbd5e1', 'center', 'normal', w - 100);
 
       // Classement du niveau visé avec la manette (Normal par défaut)
-      const id = this.hovered ?? 'normal';
+      const id = DIFFICULTIES[this.hovered] ? this.hovered : 'normal';
       const diff = DIFFICULTIES[id];
       text(ctx, 'Classement', 50, 175, 36, '#ffffff', 'left');
       text(ctx, diff.label, w - 50, 175, 32, diff.color, 'right');
@@ -180,6 +192,13 @@ export class Menu {
 
   _redraw() {
     this._drawStats();
+    const hoverPseudo = this.hovered === 'pseudo';
+    this.pseudoBtn.draw((ctx, w, h) => {
+      roundRect(ctx, 0, 0, w, h, 24, hoverPseudo ? '#facc15' : 'rgba(30, 41, 59, 0.92)');
+      const who = this.player || 'à choisir';
+      text(ctx, `✎  Pseudo : ${who}`, w * 0.05, h / 2, 30, hoverPseudo ? '#0f172a' : '#ffffff', 'left', 'bold', w * 0.6);
+      text(ctx, 'gâchette pour changer', w * 0.95, h / 2, 24, hoverPseudo ? '#0f172a' : '#94a3b8', 'right', 'normal');
+    });
     this.title.draw((ctx, w, h) => {
       roundRect(ctx, 0, 0, w, h, 40, 'rgba(15, 23, 42, 0.9)');
       text(ctx, 'MÖLKKY VR', w / 2, h * 0.4, 96, '#facc15');

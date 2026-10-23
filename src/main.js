@@ -14,6 +14,7 @@ import { HUD } from './ui/HUD.js';
 import { Feedback } from './ui/Feedback.js';
 import { Menu } from './ui/Menu.js';
 import { EndScreen } from './ui/EndScreen.js';
+import { Keyboard } from './ui/Keyboard.js';
 import { Storage } from './data/Storage.js';
 import { AudioManager } from './audio/AudioManager.js';
 import { Broadcaster, roomCode, spectatorUrl, packPose } from './net/Spectate.js';
@@ -41,6 +42,9 @@ async function init() {
   const feedback = new Feedback(sm.scene);
   const menu = new Menu(sm.scene, controllers);
   const endScreen = new EndScreen(sm.scene);
+  const keyboard = new Keyboard(controllers);
+  keyboard.mesh.position.set(0, -0.12, 0.1); // devant les boutons du menu
+  menu.group.add(keyboard.mesh);
   const storage = new Storage();
   const audio = new AudioManager(sm.camera, sm.scene);
 
@@ -48,7 +52,7 @@ async function init() {
   const room = roomCode();
   const net = new Broadcaster(room);
   showSpectatorLink();
-  showPlayerInput(storage, (name) => {
+  const setPlayerInput = showPlayerInput(storage, (name) => {
     menu.player = name;
     if (menu.visible) menu.show(d); // redessine le panneau des parties
   });
@@ -82,6 +86,8 @@ async function init() {
     applyDistance(DIFFICULTIES[difficulty].distance);
     pins.resetAll();
     resetMolkky();
+    keyboard.close();
+    menu.setButtonsVisible(true);
     menu.show(d);
   };
 
@@ -100,7 +106,16 @@ async function init() {
 
     menu.onSelect((id) => {
     audio.play2D('click');
-    startGame(id);
+    if (id !== 'pseudo') return startGame(id);
+    // Bouton « Pseudo » : clavier virtuel dans le casque
+    menu.setButtonsVisible(false);
+    keyboard.open(storage.getPlayer(), (name) => {
+      storage.setPlayer(name);
+      menu.player = storage.getPlayer();
+      setPlayerInput(menu.player);
+      menu.setButtonsVisible(true);
+      menu.show(d);
+    });
   });
 
   // --- Sons ---
@@ -195,7 +210,7 @@ async function init() {
   // 0 gâchette · 4 A/X · 5 B/Y
   controllers.onButtonDown((hand, i) => {
     if (menu.visible) {
-      if (i === 0) menu.trigger(hand); // gâchette → valide le bouton visé
+      if (i === 0) (keyboard.visible ? keyboard : menu).trigger(hand); // gâchette → bouton ou touche visé
       return;
     }
     if (i === 4 && game.phase === 'over') return startGame(difficulty); // A/X en fin de partie → rejouer
@@ -218,7 +233,7 @@ async function init() {
   // --- Boucle : l'ORDRE compte ---
   sm.onUpdate(() => controllers.update());        // 1. lire les boutons
   sm.onUpdate((dt) => locomotion.update(dt));     // 2. se déplacer (joysticks)
-  sm.onUpdate(() => menu.update());               // 3. survol du menu
+  sm.onUpdate(() => (keyboard.visible ? keyboard.update() : menu.update())); // 3. survol du menu / clavier
   sm.onUpdate(() => grab.update());               // 4. cible du bâton tenu
   sm.onUpdate(() => molkky.updateDamping());      // 5. freinage au sol
   sm.onUpdate((dt) => physics.update(dt));        // 6. simuler
@@ -286,6 +301,7 @@ function showPlayerInput(storage, onChange) {
   });
   // les touches tapées dans le champ ne doivent pas déclencher les raccourcis du jeu
   input.addEventListener('keydown', (e) => e.stopPropagation());
+  return (name) => (input.value = name); // mise à jour depuis le clavier VR
 }
 
 // Lien de la page spectateur, affiché en bas de la page sur PC
