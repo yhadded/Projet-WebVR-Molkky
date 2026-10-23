@@ -55,7 +55,11 @@ export class HUD {
       // --- Lancers + dernier résultat + chrono ---
       text(ctx, `Lancer n° ${state.throws + 1}`, w * 0.75, h * 0.52, 40, '#e2e8f0');
       text(ctx, `⏱ ${formatTime(this.seconds ?? 0)}`, w * 0.75, h * 0.86, 40, '#e2e8f0');
-      if (last) {
+      // Il reste 12 points ou moins : la quille qui fait gagner (en or au-dessus des quilles)
+      const left = RULES.target - state.score;
+      if (state.status === 'playing' && left >= 1 && left <= 12) {
+        text(ctx, `Vise la quille ${left} !`, w * 0.75, h * 0.68, 36, '#facc15', 'center', 'bold', w * 0.48);
+      } else if (last) {
         const label = last.fallen.length
           ? `Dernier : +${last.points} (${last.fallen.join(', ')})`
           : 'Dernier : raté';

@@ -5,6 +5,7 @@ import { XRControllers } from './core/XRControllers.js';
 import { Locomotion } from './core/Locomotion.js';
 import { Terrain } from './game/Terrain.js';
 import { Pins } from './game/pins.js';
+import { PinLabels } from './game/PinLabels.js';
 import { Molkky, LYING } from './game/Molkky.js';
 import { GrabSystem } from './game/GrabSystem.js';
 import { FallDetector } from './game/FallDetector.js';
@@ -33,6 +34,7 @@ async function init() {
   const sm = new SceneManager();
   const terrain = new Terrain(sm.scene, physics);
   const pins = new Pins(physics, sm.scene);
+  const pinLabels = new PinLabels(sm.scene, pins);
   const molkky = new Molkky(physics, sm.scene);
   const controllers = new XRControllers(sm.renderer, sm.player);
   const grab = new GrabSystem(controllers, molkky);
@@ -250,6 +252,7 @@ async function init() {
   sm.onUpdate(() => grab.update());               // 4. cible du bâton tenu
   sm.onUpdate(() => molkky.updateDamping());      // 5. freinage au sol
   sm.onUpdate((dt) => physics.update(dt));        // 6. simuler
+  sm.onUpdate(() => pinLabels.update(menu.visible ? null : game.state.score, !menu.visible)); // numéros au-dessus des quilles
   sm.onUpdate(() => grab.lateUpdate());           // 7. caler le visuel sur la main
   sm.onUpdate((dt) => feedback.update(dt));       // 8. fondu des messages
   sm.onUpdate((dt) => fallDetector.update(dt));   // 9. attendre l'immobilité

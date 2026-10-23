@@ -4,6 +4,7 @@ import { SceneManager } from '../core/SceneManager.js';
 import { Physics } from '../core/Physics.js';
 import { Terrain } from '../game/Terrain.js';
 import { Pins } from '../game/pins.js';
+import { PinLabels } from '../game/PinLabels.js';
 import { Molkky } from '../game/Molkky.js';
 import { HUD } from '../ui/HUD.js';
 import { Feedback } from '../ui/Feedback.js';
@@ -22,6 +23,8 @@ export async function runSpectator(code) {
 
   const terrain = new Terrain(sm.scene, physics);
   const pins = new Pins(physics, sm.scene);
+  const pinLabels = new PinLabels(sm.scene, pins);
+  let score = null; // score du joueur (pour la quille gagnante en or)
   const molkky = new Molkky(physics, sm.scene);
   const hud = new HUD(sm.scene);
   const feedback = new Feedback(sm.scene);
@@ -115,6 +118,7 @@ export async function runSpectator(code) {
 
   const applyEvent = (e) => {
     if (!e.state) return;
+    score = e.state.status === 'playing' ? e.state.score : null;
     hud.render(e.state, e.last);
     // un message vieux de plus de 3 s (spectateur arrivé en cours de route) n'est pas rejoué
     const fresh = Date.now() - (e.at ?? 0) < 3000;
@@ -174,6 +178,7 @@ export async function runSpectator(code) {
       t.mesh.quaternion.slerp(t.quat, a);
     }
     feedback.update(dt);
+    pinLabels.update(menuShown ? null : score, !menuShown);
 
     // Corps sous la tête (du sol jusqu'au cou)
     const head = avatar.head;
