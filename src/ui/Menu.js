@@ -142,7 +142,7 @@ export class Menu {
         '3 lancers ratés d\'affilée = perdu',
       ], 160);
       section('Commandes', [
-        'Grip : prendre le bâton',
+        'Grip : bâton en travers de la paume',
         'Balancer par en dessous, lâcher',
         'Joystick gauche : se déplacer',
         'A : bâton sur la table · rejouer',

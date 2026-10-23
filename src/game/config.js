@@ -48,7 +48,7 @@ export const CONFIG = {
 
   grab: {
     radius: 0.3,               // distance max main ↔ centre du bâton pour saisir
-    holdFromEnd: 0.03,         // on tient le bâton par le bout : 3 cm entre la main et l'extrémité
+    holdOffset: 0.02,          // bâton tenu en travers de la paume, un peu décalé côté pouce
   },
 
     throw: {

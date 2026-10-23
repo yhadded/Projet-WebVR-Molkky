@@ -19,11 +19,11 @@ export class GrabSystem {
     this.heldBy = null; // la main qui tient le Mölkky (ou null)
 
     // Pose du bâton DANS la main, comme au vrai Mölkky :
-    // tenu PAR LE BOUT, dans le prolongement de l'avant-bras (direction du rayon de visée),
-    // pour pouvoir le lancer par en dessous, bras tendu.
+    // tenu EN TRAVERS de la paume, perpendiculaire à l'avant-bras, les doigts autour
+    // (paume vers le haut, on balance le bras par en dessous).
+    // Dans le repère "grip", l'axe -Z traverse le poing (de l'auriculaire vers le pouce).
     // Notre cylindre est sur l'axe Y → on le tourne de -90° autour de X pour l'aligner sur -Z.
-    const { length } = CONFIG.molkky;
-    this.offsetPos = new THREE.Vector3(0, 0, -(length / 2 - CONFIG.grab.holdFromEnd));
+    this.offsetPos = new THREE.Vector3(0, 0, -CONFIG.grab.holdOffset);
     this.offsetQuat = new THREE.Quaternion().setFromAxisAngle(
       new THREE.Vector3(1, 0, 0), -Math.PI / 2
     );
@@ -95,10 +95,11 @@ export class GrabSystem {
     this._emitThrow(5.8);
   }
 
-  // Pose monde visée : position de la paume (grip) + orientation de l'avant-bras (rayon) × offset
+  // Pose monde visée = pose de la paume (grip) × offset
   _computeTarget() {
-    this.heldBy.grip.getWorldPosition(_handPos);
-    this.heldBy.ray.getWorldQuaternion(_handQuat);
+    const grip = this.heldBy.grip;
+    grip.getWorldPosition(_handPos);
+    grip.getWorldQuaternion(_handQuat);
     _targetPos.copy(this.offsetPos).applyQuaternion(_handQuat).add(_handPos);
     _targetQuat.copy(_handQuat).multiply(this.offsetQuat);
   }
