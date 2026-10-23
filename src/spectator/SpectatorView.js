@@ -11,8 +11,9 @@ import { Menu } from '../ui/Menu.js';
 import { EndScreen } from '../ui/EndScreen.js';
 import { Receiver } from '../net/Spectate.js';
 
-// Page spectateur (?spectateur=1234) : rejoue en direct la partie du casque.
+// Page spectateur (?spectateur) : rejoue en direct la partie du casque.
 // Mêmes objets que le jeu, mais SANS physique : on recopie les positions reçues.
+// Sans code, la page suit automatiquement le casque qui joue ; s'il y en a plusieurs, on choisit.
 export async function runSpectator(code) {
   const physics = await Physics.create(); // seulement pour construire les objets (jamais simulé)
   const sm = new SceneManager();
@@ -86,13 +87,43 @@ export async function runSpectator(code) {
   };
 
   // --- Bandeau d'infos ---
-  const overlay = createOverlay(code);
+  const overlay = createOverlay();
   let lastState = 0;
   let status = 'connecting';
 
+  // --- Casques connus : code → { seen (dernier état reçu), event (dernier score) } ---
+  const rooms = new Map();
+  const room = (c) => rooms.get(c) ?? rooms.set(c, { seen: 0, event: null }).get(c);
+  const isLive = (c) => performance.now() - room(c).seen < 3000;
+  let current = code; // casque suivi (null = pas encore choisi)
+
+  const follow = (c) => {
+    if (c === current) return;
+    current = c;
+    tracks.forEach((t) => (t.ready = false)); // on replace tout d'un coup sur le nouveau casque
+    menuShown = null;
+    feedback.hide();
+    const e = room(c).event;
+    if (e) applyEvent({ ...e, msg: null });
+  };
+
+  const applyEvent = (e) => {
+    if (!e.state) return;
+    hud.render(e.state, e.last);
+    // un message vieux de plus de 3 s (spectateur arrivé en cours de route) n'est pas rejoué
+    const fresh = Date.now() - (e.at ?? 0) < 3000;
+    const [title, sub, color, duration] = e.msg ?? [];
+    if (title && (fresh || duration == null)) feedback.show(title, sub, color, duration ?? Infinity);
+    if (e.end) endScreen.show(e.end);
+    else endScreen.hide();
+  };
+
   new Receiver(code, {
-    onStatus: (s) => (status = s),
-    onState: (s) => {
+    onStatus: (st) => (status = st),
+    onState: (from, s) => {
+      room(from).seen = performance.now();
+      if (!current || (!code && !isLive(current))) follow(from); // premier casque trouvé
+      if (from !== current) return;
       lastState = performance.now();
       applyDistance(s.d);
       setMenu(!!s.m);
@@ -104,15 +135,9 @@ export async function runSpectator(code) {
       pins.list.forEach((pin) => pin.setHighlight(s.hl?.includes(pin.number) ? 0xaa2222 : null));
       hud.setTime(s.t ?? 0);
     },
-    onEvent: (e) => {
-      if (!e.state) return;
-      hud.render(e.state, e.last);
-      // un message vieux de plus de 3 s (spectateur arrivé en cours de route) n'est pas rejoué
-      const fresh = Date.now() - (e.at ?? 0) < 3000;
-      const [title, sub, color, duration] = e.msg ?? [];
-      if (title && (fresh || duration == null)) feedback.show(title, sub, color, duration ?? Infinity);
-      if (e.end) endScreen.show(e.end);
-      else endScreen.hide();
+    onEvent: (from, e) => {
+      room(from).event = e;
+      if (from === current) applyEvent(e);
     },
   });
 
@@ -165,6 +190,7 @@ export async function runSpectator(code) {
       : 'Connexion…';
     overlay.status.textContent = label;
     overlay.status.style.color = live ? '#22c55e' : '#facc15';
+    overlay.showRooms(code ? [] : [...rooms.keys()].filter(isLive), current, follow);
   });
 
   sm.start();
@@ -198,13 +224,35 @@ function createAvatar(scene) {
   return { head, left, right, body };
 }
 
-function createOverlay(code) {
+function createOverlay() {
   const box = document.createElement('div');
   box.style.cssText = `position:fixed;left:16px;top:16px;font:600 15px system-ui,sans-serif;color:#e2e8f0;
-    background:rgba(15,23,42,.8);padding:10px 14px;border-radius:12px;pointer-events:none;line-height:1.5`;
-  box.innerHTML = `<div>Mölkky VR · spectateur · code <b>${code}</b></div>
+    background:rgba(15,23,42,.8);padding:10px 14px;border-radius:12px;line-height:1.5`;
+  box.innerHTML = `<div>Mölkky VR · spectateur</div>
     <div id="sp-status">Connexion…</div>
+    <div id="sp-rooms" style="display:none;margin:4px 0"></div>
     <div style="color:#94a3b8;font-weight:400">1 vue d'ensemble (souris) · 2 près des quilles · 3 vue du joueur</div>`;
   document.body.appendChild(box);
-  return { status: box.querySelector('#sp-status') };
+  const list = box.querySelector('#sp-rooms');
+  let shown = '';
+
+  // Plusieurs casques en même temps → un bouton par casque
+  const showRooms = (codes, current, onPick) => {
+    const key = codes.length > 1 ? codes.join(',') + '|' + current : '';
+    if (key === shown) return;
+    shown = key;
+    list.style.display = key ? 'block' : 'none';
+    list.innerHTML = '';
+    if (!key) return;
+    list.append('Plusieurs casques : ');
+    codes.forEach((c, i) => {
+      const b = document.createElement('button');
+      b.textContent = `Casque ${i + 1}`;
+      b.style.cssText = `margin-right:6px;padding:2px 10px;border-radius:8px;border:none;cursor:pointer;
+        font:600 14px system-ui;background:${c === current ? '#facc15' : '#334155'};color:${c === current ? '#0f172a' : '#e2e8f0'}`;
+      b.onclick = () => onPick(c);
+      list.append(b);
+    });
+  };
+  return { status: box.querySelector('#sp-status'), showRooms };
 }

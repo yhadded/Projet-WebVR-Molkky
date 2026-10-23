@@ -23,8 +23,8 @@ export function roomCode() {
   return code;
 }
 
-// Lien à ouvrir sur le PC du prof
-export const spectatorUrl = (code) => `${location.origin}${location.pathname}?spectateur=${code}`;
+// Lien à ouvrir sur le PC du prof (sans code : la page trouve le casque toute seule)
+export const spectatorUrl = () => `${location.origin}${location.pathname}?spectateur`;
 
 const connect = () => mqtt.connect(brokerUrl(), { reconnectPeriod: 2000, connectTimeout: 8000 });
 
@@ -50,23 +50,25 @@ export class Broadcaster {
 }
 
 // --- Côté spectateur ---
+// code = null → écoute TOUS les casques (le choix se fait dans la page spectateur)
+// onState(code, état) / onEvent(code, évènement)
 export class Receiver {
   constructor(code, { onState, onEvent, onStatus }) {
-    const stateTopic = `${PREFIX}/${code}/state`;
-    const eventTopic = `${PREFIX}/${code}/event`;
+    const room = code || '+'; // '+' = joker MQTT : n'importe quel code
     this.client = connect();
     this.client.on('connect', () => {
       onStatus('waiting');
-      this.client.subscribe([stateTopic, eventTopic]);
+      this.client.subscribe([`${PREFIX}/${room}/state`, `${PREFIX}/${room}/event`]);
     });
     this.client.on('reconnect', () => onStatus('connecting'));
     this.client.on('offline', () => onStatus('offline'));
     this.client.on('error', () => onStatus('offline'));
     this.client.on('message', (topic, payload) => {
+      const [, from, kind] = topic.split('/'); // molkky-vr-efrei/<code>/<state|event>
       let data;
       try { data = JSON.parse(payload.toString()); } catch { return; }
-      if (topic === stateTopic) onState(data);
-      else onEvent(data);
+      if (kind === 'state') onState(from, data);
+      else if (kind === 'event') onEvent(from, data);
     });
   }
 }

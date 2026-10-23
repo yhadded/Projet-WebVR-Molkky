@@ -16,15 +16,14 @@ import { Menu } from './ui/Menu.js';
 import { EndScreen } from './ui/EndScreen.js';
 import { Storage } from './data/Storage.js';
 import { AudioManager } from './audio/AudioManager.js';
-import { Panel, roundRect, text } from './ui/Panel.js';
 import { Broadcaster, roomCode, spectatorUrl, packPose } from './net/Spectate.js';
 
 async function init() {
   // Page spectateur (?spectateur=1234) : on rejoue la partie du casque au lieu de jouer
-  const spectate = new URLSearchParams(location.search).get('spectateur');
-  if (spectate) {
+  const params = new URLSearchParams(location.search);
+  if (params.has('spectateur')) {
     const { runSpectator } = await import('./spectator/SpectatorView.js');
-    return runSpectator(spectate);
+    return runSpectator(params.get('spectateur') || null); // sans code : casque trouvé automatiquement
   }
 
   // --- Création des modules ---
@@ -48,7 +47,7 @@ async function init() {
   // --- Mode spectateur : le casque diffuse la partie ---
   const room = roomCode();
   const net = new Broadcaster(room);
-  showSpectatorCode(room, menu);
+  showSpectatorLink();
 
   let difficulty = 'normal';
   let d = DIFFICULTIES[difficulty].distance; // distance quilles → ligne
@@ -256,21 +255,13 @@ async function init() {
   sm.start();
 }
 
-// Code spectateur : sous le menu dans le casque + lien sur la page du PC
-function showSpectatorCode(code, menu) {
-  const sign = new Panel(1.0, 0.13);
-  sign.draw((ctx, w, h) => {
-    roundRect(ctx, 0, 0, w, h, 24, 'rgba(15, 23, 42, 0.85)');
-    text(ctx, `Code spectateur : ${code}`, w / 2, h / 2, 34, '#facc15', 'center', 'normal');
-  });
-  sign.mesh.position.set(0, -0.6, 0); // sous les 3 boutons
-  menu.group.add(sign.mesh);
-
-  const link = spectatorUrl(code);
+// Lien de la page spectateur, affiché en bas de la page sur PC
+function showSpectatorLink() {
+  const link = spectatorUrl();
   const box = document.createElement('div');
   box.style.cssText = `position:fixed;left:16px;bottom:16px;font:14px system-ui,sans-serif;color:#e2e8f0;
     background:rgba(15,23,42,.75);padding:8px 12px;border-radius:10px`;
-  box.innerHTML = `Spectateur : code <b>${code}</b> · <a href="${link}" target="_blank" style="color:#facc15">${link}</a>`;
+  box.innerHTML = `Spectateur : <a href="${link}" target="_blank" style="color:#facc15">${link}</a>`;
   document.body.appendChild(box);
 }
 
