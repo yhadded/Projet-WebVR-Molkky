@@ -9,7 +9,6 @@ import { Molkky, LYING } from './game/Molkky.js';
 import { GrabSystem } from './game/GrabSystem.js';
 import { FallDetector } from './game/FallDetector.js';
 import { GameState } from './game/GameState.js';
-import { AimAssist } from './game/AimAssist.js';
 import { DIFFICULTIES } from './game/difficulty.js';
 import { HUD } from './ui/HUD.js';
 import { Feedback } from './ui/Feedback.js';
@@ -29,7 +28,6 @@ async function init() {
   const grab = new GrabSystem(controllers, molkky);
   const fallDetector = new FallDetector(pins, molkky);
   const locomotion = new Locomotion(sm.player, sm.camera, controllers);
-  const aimAssist = new AimAssist(sm.scene, grab, molkky);
   const game = new GameState();
   const hud = new HUD(sm.scene);
   const feedback = new Feedback(sm.scene);
@@ -73,7 +71,6 @@ async function init() {
     endScreen.hide();
     hud.panel.mesh.visible = true;
     applyDistance(diff.distance);
-    aimAssist.enabled = diff.aimAssist;
     pins.resetAll();
     resetMolkky();
     grab.enabled = true;
@@ -198,10 +195,9 @@ async function init() {
   sm.onUpdate(() => molkky.updateDamping());      // 5. freinage au sol
   sm.onUpdate((dt) => physics.update(dt));        // 6. simuler
   sm.onUpdate(() => grab.lateUpdate());           // 7. caler le visuel sur la main
-  sm.onUpdate(() => aimAssist.update());          // 8. trajectoire (mode Facile)
-  sm.onUpdate((dt) => feedback.update(dt));       // 9. fondu des messages
-  sm.onUpdate((dt) => fallDetector.update(dt));   // 10. attendre l'immobilité
-  sm.onUpdate((dt) => {                           // 11. chronomètre (arrêté pendant le menu)
+  sm.onUpdate((dt) => feedback.update(dt));       // 8. fondu des messages
+  sm.onUpdate((dt) => fallDetector.update(dt));   // 9. attendre l'immobilité
+  sm.onUpdate((dt) => {                           // 10. chronomètre (arrêté pendant le menu)
     if (menu.visible) return;
     game.tick(dt);
     hud.setTime(game.elapsed);
