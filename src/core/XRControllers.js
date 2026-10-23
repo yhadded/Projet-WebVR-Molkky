@@ -5,7 +5,11 @@ export class XRControllers {
   constructor(renderer, player) {
     this.hands = [];
     this.buttonListeners = [];
+    // Modèles 3D des manettes : servis par notre site (dossier public/controllers)
+    // au lieu d'un CDN → plus rien à télécharger depuis Internet au moment d'entrer en VR
     const factory = new XRControllerModelFactory();
+    factory.setPath('./controllers');
+    preloadControllerModels();
 
     for (let i = 0; i < 2; i++) {
       // "grip" = repère de la POIGNÉE de la manette (là où est la paume)
@@ -60,4 +64,10 @@ export class XRControllers {
       });
     }
   }
+}
+// Met en cache, dès le chargement de la page, les fichiers des manettes du Quest 2
+// (profil oculus-touch-v3) : l'entrée en VR n'attend plus le réseau
+function preloadControllerModels() {
+  ['profilesList.json', 'oculus-touch-v3/profile.json', 'oculus-touch-v3/left.glb', 'oculus-touch-v3/right.glb']
+    .forEach((file) => fetch(`./controllers/${file}`).catch(() => {}));
 }
