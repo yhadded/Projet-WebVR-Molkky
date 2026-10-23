@@ -72,7 +72,6 @@ export const CONFIG = {
   locomotion: {
     speed: 1.2,         // m/s
     deadzone: 0.15,     // ignore les petits mouvements du joystick
-    snapAngleDeg: 30,   // rotation par crans
     halfWidth: 0.6,     // zone de lancer : 1,2 m de large…
     depth: 1.0,         // …et 1 m de profondeur derrière la ligne
     lineMargin: 0.15,   // la tête reste à 15 cm derrière la ligne

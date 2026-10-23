@@ -18,14 +18,14 @@ export class EndScreen {
   }
 
   // result : 'won' | 'lost' ; history : [{ fallen, points, event, score }]
-  show({ result, history, score, throws, time, best, isNewRecord, difficultyLabel }) {
+  show({ result, history, score, throws, time, best, isNewRecord, difficultyLabel, player }) {
     this.panel.draw((ctx, w, h) => {
       roundRect(ctx, 0, 0, w, h, 40, 'rgba(15, 23, 42, 0.92)');
 
       // --- En-tête ---
       const won = result === 'won';
       text(ctx, won ? 'VICTOIRE' : 'DÉFAITE', w / 2, h * 0.07, 64, won ? '#22c55e' : '#ef4444');
-            text(ctx, `${difficultyLabel} · ${score} pts · ${throws} lancers · ${formatTime(time)}`, w / 2, h * 0.14, 34, '#cbd5e1', 'center', 'normal', w * 0.92);
+            text(ctx, `${player ? player + ' · ' : ''}${difficultyLabel} · ${score} pts · ${throws} lancers · ${formatTime(time)}`, w / 2, h * 0.14, 34, '#cbd5e1', 'center', 'normal', w * 0.92);
 
       // --- Tableau des lancers ---
       const top = h * 0.21;

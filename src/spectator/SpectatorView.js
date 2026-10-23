@@ -122,9 +122,11 @@ export async function runSpectator(code) {
     onStatus: (st) => (status = st),
     onState: (from, s) => {
       room(from).seen = performance.now();
+      room(from).name = s.n;
       if (!current || (!code && !isLive(current))) follow(from); // premier casque trouvé
       if (from !== current) return;
       lastState = performance.now();
+      overlay.player.textContent = s.n ? `Joueur : ${s.n}` : '';
       applyDistance(s.d);
       setMenu(!!s.m);
       setTarget(mTrack, s.k);
@@ -190,7 +192,7 @@ export async function runSpectator(code) {
       : 'Connexion…';
     overlay.status.textContent = label;
     overlay.status.style.color = live ? '#22c55e' : '#facc15';
-    overlay.showRooms(code ? [] : [...rooms.keys()].filter(isLive), current, follow);
+    overlay.showRooms(code ? [] : [...rooms.keys()].filter(isLive), current, follow, (c) => room(c).name);
   });
 
   sm.start();
@@ -229,6 +231,7 @@ function createOverlay() {
   box.style.cssText = `position:fixed;left:16px;top:16px;font:600 15px system-ui,sans-serif;color:#e2e8f0;
     background:rgba(15,23,42,.8);padding:10px 14px;border-radius:12px;line-height:1.5`;
   box.innerHTML = `<div>Mölkky VR · spectateur</div>
+    <div id="sp-player" style="color:#facc15"></div>
     <div id="sp-status">Connexion…</div>
     <div id="sp-rooms" style="display:none;margin:4px 0"></div>
     <div style="color:#94a3b8;font-weight:400">1 vue d'ensemble (souris) · 2 près des quilles · 3 vue du joueur</div>`;
@@ -237,8 +240,8 @@ function createOverlay() {
   let shown = '';
 
   // Plusieurs casques en même temps → un bouton par casque
-  const showRooms = (codes, current, onPick) => {
-    const key = codes.length > 1 ? codes.join(',') + '|' + current : '';
+  const showRooms = (codes, current, onPick, nameOf) => {
+    const key = codes.length > 1 ? codes.map((c) => c + nameOf(c)).join(',') + '|' + current : '';
     if (key === shown) return;
     shown = key;
     list.style.display = key ? 'block' : 'none';
@@ -247,12 +250,12 @@ function createOverlay() {
     list.append('Plusieurs casques : ');
     codes.forEach((c, i) => {
       const b = document.createElement('button');
-      b.textContent = `Casque ${i + 1}`;
+      b.textContent = nameOf(c) || `Casque ${i + 1}`;
       b.style.cssText = `margin-right:6px;padding:2px 10px;border-radius:8px;border:none;cursor:pointer;
         font:600 14px system-ui;background:${c === current ? '#facc15' : '#334155'};color:${c === current ? '#0f172a' : '#e2e8f0'}`;
       b.onclick = () => onPick(c);
       list.append(b);
     });
   };
-  return { status: box.querySelector('#sp-status'), showRooms };
+  return { status: box.querySelector('#sp-status'), player: box.querySelector('#sp-player'), showRooms };
 }

@@ -72,3 +72,27 @@ test('données corrompues ou stockage absent → le jeu ne plante pas', () => {
   assert.doesNotThrow(() => s.saveGame(win('normal', 10)));
   assert.doesNotThrow(() => new Storage(undefined).saveGame(win('easy', 5)));
 });
+test('le pseudo est gardé et associé au record', () => {
+  const ls = fakeLocalStorage();
+  const s = new Storage(ls);
+  s.setPlayer('  Yassine  ');
+  assert.equal(s.getPlayer(), 'Yassine');
+  s.saveGame({ ...win('easy', 8), player: s.getPlayer() });
+  assert.equal(s.getAllBestPlayers().easy, 'Yassine');
+  const reloaded = new Storage(ls);
+  assert.equal(reloaded.getPlayer(), 'Yassine');
+  assert.equal(reloaded.getGames()[0].player, 'Yassine');
+});
+
+test('classement : meilleure victoire de chaque joueur, triée par lancers puis temps', () => {
+  const s = new Storage(fakeLocalStorage());
+  const w = (player, throws, time) => s.saveGame({ ...win('normal', throws), time, player });
+  w('Raphaël', 14, 200);
+  w('Yassine', 12, 300);
+  w('Raphaël', 11, 250); // son meilleur
+  w('Orlane', 12, 180);  // même nombre de lancers que Yassine, mais plus rapide
+  s.saveGame({ ...loss('normal'), player: 'Femi' }); // une défaite ne compte pas
+  const board = s.getLeaderboard('normal');
+  assert.deepEqual(board.map((r) => [r.player, r.throws]), [['Raphaël', 11], ['Orlane', 12], ['Yassine', 12]]);
+  assert.deepEqual(s.getLeaderboard('easy'), []);
+});

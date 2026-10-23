@@ -7,7 +7,7 @@ const _forward = new THREE.Vector3();
 const _right = new THREE.Vector3();
 const _move = new THREE.Vector3();
 
-// Joystick gauche : déplacement. Joystick droit : rotation par crans.
+// Joystick gauche : déplacement (on se tourne physiquement, pas de rotation au joystick).
 // Le joueur (sa TÊTE) reste toujours dans la zone de lancer : interdit de dépasser la ligne.
 export class Locomotion {
   constructor(player, camera, controllers) {
@@ -15,7 +15,6 @@ export class Locomotion {
     this.camera = camera;
     this.controllers = controllers;
     this.lineZ = 0;
-    this.snapReady = true; // une rotation par poussée du joystick
   }
 
   // Position de la ligne de lancer (dépend de la difficulté)
@@ -32,7 +31,7 @@ export class Locomotion {
   }
 
   update(dt) {
-    const { speed, deadzone, snapAngleDeg } = CONFIG.locomotion;
+    const { speed, deadzone } = CONFIG.locomotion;
 
     // --- Déplacement (joystick gauche), dans la direction du regard ---
     const left = this._stick('left');
@@ -46,19 +45,6 @@ export class Locomotion {
         .addScaledVector(_right, left.x)
         .multiplyScalar(speed * dt);
       this.player.position.add(_move);
-    }
-
-    // --- Rotation par crans (joystick droit) : évite le mal des transports ---
-    const right = this._stick('right');
-    if (this.snapReady && Math.abs(right.x) > 0.7) {
-      const angle = -Math.sign(right.x) * THREE.MathUtils.degToRad(snapAngleDeg);
-      // On tourne AUTOUR DE LA TÊTE, pas autour du centre de la pièce
-      this.camera.getWorldPosition(_head);
-      this.player.position.sub(_head).applyAxisAngle(UP, angle).add(_head);
-      this.player.rotation.y += angle;
-      this.snapReady = false;
-    } else if (Math.abs(right.x) < 0.3) {
-      this.snapReady = true; // joystick relâché → prochaine rotation autorisée
     }
 
     this._clampToThrowZone();

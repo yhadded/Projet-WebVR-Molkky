@@ -48,6 +48,10 @@ async function init() {
   const room = roomCode();
   const net = new Broadcaster(room);
   showSpectatorLink();
+  showPlayerInput(storage, (name) => {
+    menu.player = name;
+    if (menu.visible) menu.show(d); // redessine le panneau des parties
+  });
 
   let difficulty = 'normal';
   let d = DIFFICULTIES[difficulty].distance; // distance quilles → ligne
@@ -71,6 +75,10 @@ async function init() {
     endScreen.hide();
     hud.panel.mesh.visible = false;
     menu.best = storage.getAllBest(); // records à jour sur les boutons
+    menu.games = storage.getGames();  // dernières parties (panneau de droite)
+    menu.bestPlayer = storage.getAllBestPlayers();
+    menu.leaderboard = Object.fromEntries(Object.keys(DIFFICULTIES).map((id) => [id, storage.getLeaderboard(id)]));
+    menu.player = storage.getPlayer();
     applyDistance(DIFFICULTIES[difficulty].distance);
     pins.resetAll();
     resetMolkky();
@@ -154,6 +162,7 @@ async function init() {
         throws: state.throws,
         time: Math.round(game.elapsed),
         history: game.history,
+        player: storage.getPlayer() || 'Joueur',
       });
       end = {
         result: state.status,
@@ -164,6 +173,7 @@ async function init() {
         best: storage.getBest(difficulty),
         isNewRecord,
         difficultyLabel: label,
+        player: storage.getPlayer() || 'Joueur',
       };
       endScreen.show(end);
     }
@@ -240,6 +250,7 @@ async function init() {
     netTimer = 0;
     net.sendState({
       d,
+      n: storage.getPlayer() || 'Joueur',
       m: menu.visible ? 1 : 0,
       t: Math.floor(game.elapsed),
       h: worldPose(sm.camera),
@@ -256,6 +267,25 @@ async function init() {
   // sinon le casque les compile au moment d'entrer en VR → écran figé quelques secondes
   sm.renderer.compileAsync(sm.scene, sm.camera).catch(() => {});
   sm.start();
+}
+
+// Champ « Pseudo » sur la page (à remplir avant ENTER VR, au clavier du casque ou du PC)
+function showPlayerInput(storage, onChange) {
+  const box = document.createElement('div');
+  box.style.cssText = `position:fixed;left:50%;top:16px;transform:translateX(-50%);font:600 16px system-ui,sans-serif;
+    color:#e2e8f0;background:rgba(15,23,42,.8);padding:10px 14px;border-radius:12px;display:flex;gap:10px;align-items:center`;
+  box.innerHTML = `<label for="pseudo">Pseudo</label>
+    <input id="pseudo" maxlength="16" placeholder="Ton prénom" autocomplete="off"
+      style="font:16px system-ui;padding:6px 10px;border-radius:8px;border:1px solid #475569;background:#0f172a;color:#fff;width:170px">`;
+  document.body.appendChild(box);
+  const input = box.querySelector('input');
+  input.value = storage.getPlayer();
+  input.addEventListener('input', () => {
+    storage.setPlayer(input.value);
+    onChange(storage.getPlayer());
+  });
+  // les touches tapées dans le champ ne doivent pas déclencher les raccourcis du jeu
+  input.addEventListener('keydown', (e) => e.stopPropagation());
 }
 
 // Lien de la page spectateur, affiché en bas de la page sur PC
