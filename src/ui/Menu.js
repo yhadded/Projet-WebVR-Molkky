@@ -189,8 +189,9 @@ export class Menu {
     this.pseudoBtn.draw((ctx, w, h) => {
       roundRect(ctx, 0, 0, w, h, 24, hoverPseudo ? '#facc15' : 'rgba(30, 41, 59, 0.92)');
       const who = this.player || 'à choisir';
+      // pseudo à gauche, « Changer › » à droite : la zone du pseudo s'arrête avant (pas de chevauchement)
       text(ctx, `✎  Pseudo : ${who}`, w * 0.05, h / 2, 30, hoverPseudo ? '#0f172a' : '#ffffff', 'left', 'bold', w * 0.6);
-      text(ctx, 'gâchette pour changer', w * 0.95, h / 2, 24, hoverPseudo ? '#0f172a' : '#94a3b8', 'right', 'normal');
+      text(ctx, 'Changer ›', w * 0.95, h / 2, 26, hoverPseudo ? '#0f172a' : '#facc15', 'right', 'bold');
     });
     this.title.draw((ctx, w, h) => {
       roundRect(ctx, 0, 0, w, h, 40, 'rgba(15, 23, 42, 0.9)');
