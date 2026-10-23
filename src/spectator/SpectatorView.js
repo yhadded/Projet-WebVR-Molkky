@@ -9,6 +9,7 @@ import { HUD } from '../ui/HUD.js';
 import { Feedback } from '../ui/Feedback.js';
 import { Menu } from '../ui/Menu.js';
 import { EndScreen } from '../ui/EndScreen.js';
+import { Leaderboard } from '../ui/Leaderboard.js';
 import { Receiver } from '../net/Spectate.js';
 
 // Page spectateur (?spectateur) : rejoue en direct la partie du casque.
@@ -26,6 +27,7 @@ export async function runSpectator(code) {
   const feedback = new Feedback(sm.scene);
   const menu = new Menu(sm.scene, { hands: [] });
   const endScreen = new EndScreen(sm.scene);
+  const leaderboard = new Leaderboard(sm.scene);
   const avatar = createAvatar(sm.scene);
   hud.panel.mesh.visible = false;
 
@@ -63,12 +65,14 @@ export async function runSpectator(code) {
 
   // --- Distance / menu (comme dans le casque) ---
   let menuShown = null;
+  let lastBoard = null; // classement de la partie en cours (affiché hors menu)
   const applyDistance = (dist) => {
     if (dist === d && menuShown !== null) return;
     d = dist;
     terrain.setThrowDistance(d);
     hud.panel.mesh.position.z = d - 2.3;
     endScreen.setThrowDistance(d);
+    leaderboard.setThrowDistance(d);
     if (menuShown) menu.show(d);
     if (view === 'side') sideView();
   };
@@ -79,10 +83,12 @@ export async function runSpectator(code) {
       menu.show(d);
       feedback.hide();
       endScreen.hide();
+      leaderboard.hide();
       hud.panel.mesh.visible = false;
     } else {
       menu.hide();
       hud.panel.mesh.visible = true;
+      if (lastBoard) leaderboard.show(lastBoard);
     }
   };
 
@@ -114,8 +120,14 @@ export async function runSpectator(code) {
     const fresh = Date.now() - (e.at ?? 0) < 3000;
     const [title, sub, color, duration] = e.msg ?? [];
     if (title && (fresh || duration == null)) feedback.show(title, sub, color, duration ?? Infinity);
-    if (e.end) endScreen.show(e.end);
-    else endScreen.hide();
+    lastBoard = e.end ? null : e.board ?? null;
+    if (e.end) {
+      leaderboard.hide();
+      endScreen.show(e.end);
+    } else {
+      endScreen.hide();
+      if (e.board && !menuShown) leaderboard.show(e.board);
+    }
   };
 
   new Receiver(code, {

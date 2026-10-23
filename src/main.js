@@ -15,6 +15,7 @@ import { Feedback } from './ui/Feedback.js';
 import { Menu } from './ui/Menu.js';
 import { EndScreen } from './ui/EndScreen.js';
 import { Keyboard } from './ui/Keyboard.js';
+import { Leaderboard } from './ui/Leaderboard.js';
 import { Storage } from './data/Storage.js';
 import { AudioManager } from './audio/AudioManager.js';
 import { Broadcaster, roomCode, spectatorUrl, packPose } from './net/Spectate.js';
@@ -42,6 +43,7 @@ async function init() {
   const feedback = new Feedback(sm.scene);
   const menu = new Menu(sm.scene, controllers);
   const endScreen = new EndScreen(sm.scene);
+  const leaderboard = new Leaderboard(sm.scene);
   const keyboard = new Keyboard(controllers);
   keyboard.mesh.position.set(0, -0.12, 0.1); // devant les boutons du menu
   menu.group.add(keyboard.mesh);
@@ -58,6 +60,7 @@ async function init() {
   });
 
   let difficulty = 'normal';
+  let board = null; // classement affiché (envoyé aussi au spectateur)
   let d = DIFFICULTIES[difficulty].distance; // distance quilles → ligne
 
   const resetMolkky = () => molkky.setPose(terrain.molkkySpawn, LYING);
@@ -70,6 +73,7 @@ async function init() {
     sm.setPlayerPosition(0, d + 0.5);
     hud.panel.mesh.position.z = d - 2.3; // le tableau suit la zone de lancer
     endScreen.setThrowDistance(d);
+    leaderboard.setThrowDistance(d);
   };
 
   // --- Menu ↔ partie ---
@@ -77,11 +81,11 @@ async function init() {
     grab.enabled = false;
     feedback.hide();
     endScreen.hide();
+    leaderboard.hide();
     hud.panel.mesh.visible = false;
     menu.best = storage.getAllBest(); // records à jour sur les boutons
     menu.games = storage.getGames();  // dernières parties (panneau de droite)
     menu.bestPlayer = storage.getAllBestPlayers();
-    menu.leaderboard = Object.fromEntries(Object.keys(DIFFICULTIES).map((id) => [id, storage.getLeaderboard(id)]));
     menu.player = storage.getPlayer();
     applyDistance(DIFFICULTIES[difficulty].distance);
     pins.resetAll();
@@ -101,6 +105,14 @@ async function init() {
     pins.resetAll();
     resetMolkky();
     grab.enabled = true;
+    // Classement du niveau choisi, affiché pendant la partie
+    board = {
+      label: diff.label,
+      color: diff.color,
+      rows: storage.getLeaderboard(id),
+      player: storage.getPlayer() || 'Joueur',
+    };
+    leaderboard.show(board);
     game.reset();
   };
 
@@ -190,11 +202,12 @@ async function init() {
         difficultyLabel: label,
         player: storage.getPlayer() || 'Joueur',
       };
+      leaderboard.hide(); // l'écran de fin prend sa place
       endScreen.show(end);
     }
 
     // Spectateur : score, message et récapitulatif
-    net.sendEvent({ state, last: event === 'start' ? null : { points, fallen }, msg, end, at: Date.now() });
+    net.sendEvent({ state, last: event === 'start' ? null : { points, fallen }, msg, end, board, at: Date.now() });
 
     // Lancer suivant : Mölkky sur la table + quilles tombées relevées sur place
     if (event !== 'start' && state.status === 'playing') {

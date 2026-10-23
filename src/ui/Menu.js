@@ -52,7 +52,6 @@ export class Menu {
     this.bestPlayer = {}; // pseudo du détenteur de chaque record
     this.player = '';     // pseudo du joueur actuel
     this.games = []; // dernières parties (Storage.getGames)
-    this.leaderboard = {}; // classement par difficulté (Storage.getLeaderboard)
     this._redraw();
   }
 
@@ -159,27 +158,21 @@ export class Menu {
       text(ctx, 'PARTIES', w / 2, 70, 52, '#facc15');
       text(ctx, `Joueur : ${this.player || 'Joueur'}`, w / 2, 122, 30, '#cbd5e1', 'center', 'normal', w - 100);
 
-      // Classement du niveau visé avec la manette (Normal par défaut)
-      const id = DIFFICULTIES[this.hovered] ? this.hovered : 'normal';
-      const diff = DIFFICULTIES[id];
-      text(ctx, 'Classement', 50, 175, 36, '#ffffff', 'left');
-      text(ctx, diff.label, w - 50, 175, 32, diff.color, 'right');
-      const rows = this.leaderboard[id] ?? [];
-      if (!rows.length) text(ctx, 'Personne n\'a encore gagné', 60, 235, 29, '#64748b', 'left', 'normal');
-      const medals = ['#facc15', '#cbd5e1', '#d97706'];
-      rows.forEach((r, i) => {
-        const y = 235 + i * 46;
-        text(ctx, `${i + 1}.`, 60, y, 30, medals[i] ?? '#94a3b8', 'left');
-        text(ctx, r.player, 110, y, 30, i === 0 ? '#facc15' : '#e2e8f0', 'left', i === 0 ? 'bold' : 'normal', w - 380);
-        text(ctx, `${r.throws} lancers${r.time != null ? ' · ' + formatTime(r.time) : ''}`, w - 50, y, 27, '#94a3b8', 'right', 'normal');
+      // Records de chaque niveau (le classement complet s'affiche en partie)
+      text(ctx, 'Records', 50, 185, 36, '#ffffff', 'left');
+      Object.entries(DIFFICULTIES).forEach(([id, diff], i) => {
+        const y = 240 + i * 50;
+        text(ctx, diff.label, 60, y, 30, diff.color, 'left');
+        const best = this.best[id];
+        const who = this.bestPlayer[id] ? ` · ${this.bestPlayer[id]}` : '';
+        text(ctx, best != null ? `★ ${best} lancers${who}` : '—', w - 50, y, 28, best != null ? '#facc15' : '#64748b', 'right', 'normal', w - 260);
       });
-      text(ctx, 'Vise un niveau pour voir son classement', w / 2, 480, 24, '#64748b', 'center', 'normal', w - 80);
 
-      text(ctx, 'Dernières parties', 50, 560, 36, '#ffffff', 'left');
-      const games = this.games.slice(0, 3);
-      if (!games.length) text(ctx, 'Aucune partie pour l\'instant', 60, 620, 29, '#64748b', 'left', 'normal');
+      text(ctx, 'Dernières parties', 50, 430, 36, '#ffffff', 'left');
+      const games = this.games.slice(0, 5);
+      if (!games.length) text(ctx, 'Aucune partie pour l\'instant', 60, 490, 29, '#64748b', 'left', 'normal');
       games.forEach((g, i) => {
-        const y = 620 + i * 76;
+        const y = 490 + i * 76;
         const won = g.result === 'won';
         const d = new Date(g.date);
         const day = `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}`;
